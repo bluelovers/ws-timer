@@ -103,7 +103,7 @@ export class QueueTimer extends Time
 		this.cache.max = this.length ? this.eq(-1).timing : null;
 	}
 
-	protected _cache_timing(timing, reset?: boolean)
+	_cache_timing(timing, reset?: boolean)
 	{
 		if (reset)
 		{
