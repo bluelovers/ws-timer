@@ -113,11 +113,6 @@ export class Time
 	{
 		return this.data.fake_now.clone();
 	}
-
-	setTimeout(cb, delay)
-	{
-
-	}
 }
 
 export default Time;
