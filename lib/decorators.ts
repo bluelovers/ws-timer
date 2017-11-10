@@ -2,10 +2,14 @@
  * Created by user on 2017/8/5/005.
  */
 
-import { autobind } from 'core-decorators';
+import * as coreDecorators from 'core-decorators';
+import { autobind, readonly, nonconfigurable } from 'core-decorators';
 
 export {
 	autobind,
+	readonly,
+	nonconfigurable,
+	coreDecorators,
 };
 
 /**

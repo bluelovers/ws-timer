@@ -15,9 +15,13 @@ export interface ITimeQueueItem
 {
 	id?: number;
 	timing?: moment.Moment;
+	active?: moment.Moment;
+	ending?: moment.Moment;
 
 	name?: string;
 	callback?: ICallback;
+
+	params?: any[],
 
 	[key: string]: any;
 }
@@ -39,7 +43,8 @@ export interface ISortCallback extends Function
 
 export interface ISetTimeout extends Function
 {
-	(callback: ICallback, delay: number, immediate: boolean)
+	(callback: ICallback, delay: number, immediate: boolean);
+	(callback: ICallback, delay: moment.Duration, immediate: boolean);
 }
 
 export interface ICallback extends Function
@@ -89,7 +94,13 @@ export class QueueTimer extends Time
 
 		this.queue.push(q as ITimeQueueItem);
 
-		return this;
+		return q as ITimeQueueItem;
+	}
+
+	_cache_refresh()
+	{
+		this.cache.min = this.length ? this.eq(0).timing : null;
+		this.cache.max = this.length ? this.eq(-1).timing : null;
 	}
 
 	protected _cache_timing(timing, reset?: boolean)
@@ -124,12 +135,19 @@ export class QueueTimer extends Time
 
 	eq(idx: number)
 	{
+		if (idx == -1)
+		{
+			idx = this.length - 1;
+		}
+
 		return this.queue[idx];
 	}
 
 	protected _remove(idx)
 	{
 		let q = this.queue.splice(idx, 1);
+
+		//console.log(777, q.length, q);
 
 		if (q.length == 1)
 		{
@@ -141,7 +159,9 @@ export class QueueTimer extends Time
 
 	remove(id: number | string | ITimeQueueItem): null | ITimeQueueItem
 	{
-		if (typeof id == 'number')
+		//console.log(typeof id, id);
+
+		if (typeof id == 'number' || (id in this.queue))
 		{
 			return this._remove(id);
 		}
@@ -206,81 +226,3 @@ export function queueSortCallback2(a: ITimeQueueItem, b: ITimeQueueItem)
 
 	return a.timing.diff(b.timing);
 }
-
-(async () =>
-{
-	let t = QueueTimer.new();
-
-	function setTimeout2(cb: ICallback, delay)
-	{
-		return t.add({
-			callback: cb,
-			timing: moment.duration(delay, 'ms'),
-		});
-	}
-
-	for (let i = 0; i < 30; i++)
-	{
-		let q = {
-			timing: moment.duration(1 * i, 's'),
-		};
-
-		t.add(q);
-	}
-
-	{
-		let q = {
-			//id: i,
-			//name: shortid(),
-			timing: moment.duration(0, 's'),
-		};
-
-		t.add(q);
-	}
-
-	setTimeout2((timer) =>
-	{
-
-	}, 5000);
-
-	console.log(t);
-
-	//t.queue.reverse();
-
-	array_shuffle(t.queue);
-
-	t.sort();
-
-	//t.update(5000, 'ms');
-
-	let a = t.hasExpires();
-
-	//console.log(t.queue, t.length);
-
-	console.log(a);
-
-	let r = t.remove(-1);
-
-	console.log(r);
-
-	console.log(t.queue);
-
-	//await sleep(5000);
-
-	//console.log(t.update(), t.now().diff(t.data.fake_old), moment().valueOf());
-})();
-
-function sleep(ms)
-{
-	return new Promise(function (done)
-	{
-		setTimeout(done, ms);
-	});
-}
-
-function identity<T>(arg: T): T
-{
-	return arg;
-}
-
-let myIdentity: { <T>(arg: T): T } = identity;
