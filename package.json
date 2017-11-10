@@ -2,17 +2,27 @@
   "name": "fake-timer",
   "version": "1.0.0",
   "description": "Fake Timer API for node.js.",
-  "main": "index.js",
+  "main": "timer.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npx mocha"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "core-decorators": "^0.20.0",
-    "d3-timer": "^1.0.7",
     "moment": "^2.19.1",
-    "shortid": "^2.2.8",
+    "shortid": "^2.2.8"
+  },
+  "devDependencies": {
     "shuffle-array": "^1.0.1"
-  }
+  },
+  "keywords": [
+    "settimeout",
+    "duration",
+    "task",
+    "queue",
+    "fake",
+    "time",
+    "timer"
+  ]
 }
