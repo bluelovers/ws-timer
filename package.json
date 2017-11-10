@@ -24,5 +24,17 @@
     "fake",
     "time",
     "timer"
-  ]
+  ],
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bluelovers/node-fake-timer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bluelovers/node-fake-timer/issues"
+  },
+  "homepage": "https://github.com/bluelovers/node-fake-timer#readme"
 }
