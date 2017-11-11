@@ -49,7 +49,7 @@ export interface ISetTimeout extends Function
 
 export interface ICallback extends Function
 {
-	(current: ITimeQueueItem, timer: QueueTimer)
+	(current: ITimeQueueItem, timer: QueueTimer, self?)
 }
 
 @autobind
