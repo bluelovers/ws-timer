@@ -2,15 +2,26 @@
  * Created by user on 2017/11/10/010.
  */
 
-import init, { setTimeout, setImmediate } from '../timer';
+import timerScope, { setTimeout, setImmediate } from '../scope';
 import * as moment from 'moment';
 
-setTimeout(() => {}, 1500);
-let q = setTimeout(() => {}, 500);
-setImmediate(() => {});
+setTimeout(function (current, timer, self)
+{
+	console.log(this, current.id);
+}, 1500);
 
-init.start(-1)
-	.then((self) =>
+let q = setTimeout(function (current, timer, self)
+{
+	console.log(this, current.id, self);
+}, 500);
+
+setImmediate(function (current, timer, self)
+{
+	console.log(this, current.id, self);
+});
+
+timerScope.start(-1)
+	.then(function (self)
 	{
 		console.log(self.timer.data);
 		console.log(self.timer.queue);
