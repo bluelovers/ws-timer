@@ -2,7 +2,7 @@
   "name": "fake-timer",
   "version": "1.0.0",
   "description": "Fake Timer API for node.js.",
-  "main": "timer.js",
+  "main": "scope.js",
   "scripts": {
     "test": "npx mocha"
   },
@@ -14,7 +14,8 @@
     "shortid": "^2.2.8"
   },
   "devDependencies": {
-    "shuffle-array": "^1.0.1"
+    "shuffle-array": "^1.0.1",
+    "timed-queue": "^1.2.2"
   },
   "keywords": [
     "settimeout",
