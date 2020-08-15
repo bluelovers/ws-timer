@@ -27,6 +27,7 @@
   "resolutions": {},
   "devDependencies": {
     "@bluelovers/tsconfig": "^1.0.20",
+    "@types/jest": "^26.0.10",
     "@types/node": "*"
   },
   "peerDependencies": {
@@ -34,5 +35,9 @@
     "lerna": "*",
     "yarn": "*",
     "ynpx": "*"
+  },
+  "dependencies": {
+    "jest": "^26.4.0",
+    "ts-jest": "^26.2.0"
   }
 }

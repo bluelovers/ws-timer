@@ -1,0 +1,61 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`auto tick 1`] = `
+Tic {
+  "_dt": -1,
+  "_id": 0,
+  "_now": 0,
+  "_things": Map {},
+}
+`;
+
+exports[`auto tick 2`] = `
+Tic {
+  "_dt": 4000,
+  "_id": 2,
+  "_next": 20000,
+  "_now": 15000,
+  "_things": Map {
+    1 => Object {
+      "args": Array [
+        "Every",
+      ],
+      "at": 20000,
+      "elapsed": 0,
+      "fn": [Function],
+      "limit": Infinity,
+      "timeout": 5000,
+    },
+  },
+}
+`;
+
+exports[`should run interval x 3 , timeout x 1 1`] = `
+Tic {
+  "_dt": -1,
+  "_id": 0,
+  "_now": 0,
+  "_things": Map {},
+}
+`;
+
+exports[`should run interval x 3 , timeout x 1 2`] = `
+Tic {
+  "_dt": 15000,
+  "_id": 2,
+  "_next": 20000,
+  "_now": 15000,
+  "_things": Map {
+    1 => Object {
+      "args": Array [
+        "Every",
+      ],
+      "at": 20000,
+      "elapsed": 15000,
+      "fn": [Function],
+      "limit": Infinity,
+      "timeout": 5000,
+    },
+  },
+}
+`;
