@@ -1,0 +1,41 @@
+{
+  "name": "fake-timer",
+  "version": "1.0.0",
+  "description": "Fake Timer API for node.js.",
+  "main": "scope.js",
+  "scripts": {
+    "test": "npx mocha"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "core-decorators": "^0.20.0",
+    "moment": "^2.19.1",
+    "shortid": "^2.2.8"
+  },
+  "devDependencies": {
+    "shuffle-array": "^1.0.1",
+    "timed-queue": "^1.2.2"
+  },
+  "keywords": [
+    "settimeout",
+    "duration",
+    "task",
+    "queue",
+    "fake",
+    "time",
+    "timer"
+  ],
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bluelovers/node-fake-timer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bluelovers/node-fake-timer/issues"
+  },
+  "homepage": "https://github.com/bluelovers/node-fake-timer#readme"
+}
