@@ -43,5 +43,6 @@
   "devDependencies": {
     "shuffle-array": "^1.0.1",
     "timed-queue": "^1.4.0"
-  }
+  },
+  "gitHead": "52b30f8f5f879f211baf1505f30a2f0a84d526d5"
 }

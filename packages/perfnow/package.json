@@ -1,5 +1,5 @@
 {
-  "name": "performance.now",
+  "name": "performance-now2",
   "version": "1.0.2",
   "description": "window.performance.now high resolution timer polyfill",
   "keywords": [
@@ -49,5 +49,6 @@
   "peerDependencies": {
     "@types/node": "*"
   },
-  "maintainers": []
+  "maintainers": [],
+  "gitHead": "52b30f8f5f879f211baf1505f30a2f0a84d526d5"
 }
