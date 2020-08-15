@@ -1,7 +1,7 @@
 {
-  "name": "perfnow",
+  "name": "performance.now",
   "version": "1.0.0",
-  "description": "0.1 kb window.performance.now high resolution timer polyfill with Date fallback",
+  "description": "window.performance.now high resolution timer polyfill",
   "keywords": [
     "micro",
     "library",
@@ -32,7 +32,7 @@
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "echo \"Error: no test specified\"",
     "preversion": "yarn run test",
     "prepublishOnly_": "echo prepublishOnly",
     "prepublishOnly:check-bin": "ynpx --quiet @yarn-tool/check-pkg-bin",
@@ -40,7 +40,14 @@
     "ncu": "yarn-tool ncu -u",
     "sort-package-json": "yarn-tool sort"
   },
-  "dependencies": {},
-  "devDependencies": {},
+  "dependencies": {
+    "globalthis": "^1.0.1"
+  },
+  "devDependencies": {
+    "@types/globalthis": "^1.0.1"
+  },
+  "peerDependencies": {
+    "@types/node": "*"
+  },
   "maintainers": []
 }
