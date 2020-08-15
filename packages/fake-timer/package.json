@@ -2,21 +2,6 @@
   "name": "fake-timer",
   "version": "1.0.0",
   "description": "Fake Timer API for node.js.",
-  "main": "scope.js",
-  "scripts": {
-    "test": "npx mocha"
-  },
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "core-decorators": "^0.20.0",
-    "moment": "^2.19.1",
-    "shortid": "^2.2.8"
-  },
-  "devDependencies": {
-    "shuffle-array": "^1.0.1",
-    "timed-queue": "^1.2.2"
-  },
   "keywords": [
     "settimeout",
     "duration",
@@ -26,16 +11,37 @@
     "time",
     "timer"
   ],
+  "homepage": "https://github.com/bluelovers/ws-timer/tree/master/packages/fake-timer#readme",
+  "bugs": {
+    "url": "https://github.com/bluelovers/ws-timer/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bluelovers/ws-timer.git"
+  },
+  "license": "ISC",
+  "author": "bluelovers",
+  "main": "index.js",
   "directories": {
     "lib": "lib",
     "test": "test"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/bluelovers/node-fake-timer.git"
+  "scripts": {
+    "test": "echo \"Error: no test specified\"",
+    "preversion": "yarn run test",
+    "prepublishOnly_": "echo prepublishOnly",
+    "prepublishOnly:check-bin": "ynpx --quiet @yarn-tool/check-pkg-bin",
+    "prepublishOnly:update": "yarn run ncu && yarn run sort-package-json",
+    "ncu": "yarn-tool ncu -u",
+    "sort-package-json": "yarn-tool sort"
   },
-  "bugs": {
-    "url": "https://github.com/bluelovers/node-fake-timer/issues"
+  "dependencies": {
+    "core-decorators": "^0.20.0",
+    "moment": "^2.19.1",
+    "shortid": "^2.2.8"
   },
-  "homepage": "https://github.com/bluelovers/node-fake-timer#readme"
+  "devDependencies": {
+    "shuffle-array": "^1.0.1",
+    "timed-queue": "^1.2.2"
+  }
 }
