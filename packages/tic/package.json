@@ -1,6 +1,6 @@
 {
   "name": "tic2",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "intervals and timeouts using a delta tick. Useful for timing things with games.",
   "keywords": [
     "tick",
