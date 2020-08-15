@@ -21,7 +21,7 @@ Tic {
         "Every",
       ],
       "at": 20000,
-      "elapsed": 0,
+      "elapsed": 15000,
       "fn": [Function],
       "limit": Infinity,
       "timeout": 5000,
