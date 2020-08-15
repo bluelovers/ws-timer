@@ -21,7 +21,7 @@
   },
   "license": "ISC",
   "author": "bluelovers",
-  "main": "index.js",
+  "main": "timer.js",
   "directories": {
     "lib": "lib",
     "test": "test"
@@ -37,11 +37,11 @@
   },
   "dependencies": {
     "core-decorators": "^0.20.0",
-    "moment": "^2.19.1",
-    "shortid": "^2.2.8"
+    "moment": "^2.27.0",
+    "shortid": "^2.2.15"
   },
   "devDependencies": {
     "shuffle-array": "^1.0.1",
-    "timed-queue": "^1.2.2"
+    "timed-queue": "^1.4.0"
   }
 }

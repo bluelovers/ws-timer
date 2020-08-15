@@ -2,7 +2,7 @@
  * Created by user on 2017/11/10/010.
  */
 
-import * as moment from 'moment';
+import moment from 'moment';
 
 export interface ITimeData
 {

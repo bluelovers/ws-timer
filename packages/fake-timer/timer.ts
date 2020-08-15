@@ -2,8 +2,8 @@
  * Created by user on 2017/11/10/010.
  */
 
-import * as moment from 'moment';
-import { QueueTimer, ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData } from './queue.timer';
+import moment from 'moment';
+import { QueueTimer, ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData } from './queue';
 import { autobind, readonly, nonconfigurable, coreDecorators } from './lib/decorators';
 
 export interface ITimerFunc extends Function

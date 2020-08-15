@@ -2,8 +2,8 @@
  * Created by user on 2017/11/10/010.
  */
 
-import * as moment from 'moment';
-import * as shortid from 'shortid';
+import moment from 'moment';
+import shortid from 'shortid';
 import { Time, ITimeData as ITimeData2 } from './lib/time';
 import { autobind } from './lib/decorators';
 
@@ -161,6 +161,7 @@ export class QueueTimer extends Time
 	{
 		//console.log(typeof id, id);
 
+		// @ts-ignore
 		if (typeof id == 'number' || (id in this.queue))
 		{
 			return this._remove(id);
