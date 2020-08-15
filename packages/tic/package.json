@@ -33,7 +33,7 @@
     }
   ],
   "dependencies": {
-    "performance.now": "^1.0.2",
+    "performance-now2": "^1.0.2",
     "ts-type": "^1.2.32"
   },
   "gitHead": "52b30f8f5f879f211baf1505f30a2f0a84d526d5"

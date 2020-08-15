@@ -6,7 +6,7 @@
  * Licensed under the MIT license.
  */
 
-import { now } from 'performance.now/index';
+import { now } from 'performance-now2/index';
 import { nextAt } from './lib/nextAt';
 import { positiveNumber, isPositiveNumber } from './lib/positiveNumber';
 import { IThing, IThingInput } from './lib/types';

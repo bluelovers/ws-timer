@@ -22,7 +22,7 @@ var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (
 var __timestamp_base;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Tic = void 0;
-const index_1 = require("performance.now/index");
+const index_1 = require("performance-now2/index");
 const nextAt_1 = require("./lib/nextAt");
 const positiveNumber_1 = require("./lib/positiveNumber");
 class Tic {
