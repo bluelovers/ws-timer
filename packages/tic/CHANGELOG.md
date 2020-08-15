@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.2](https://github.com/bluelovers/ws-timer/compare/tic2@1.0.1...tic2@1.0.2) (2020-08-15)
+
+
+### 🔖　Miscellaneous
+
+* . ([d0af4e1](https://github.com/bluelovers/ws-timer/commit/d0af4e1dafeba8365b5223d88015908e5da1816d))
+
+
+
+
+
 ## 1.0.1 (2020-08-15)
 
 
