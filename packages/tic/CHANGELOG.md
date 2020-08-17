@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.4](https://github.com/bluelovers/ws-timer/compare/tic2@1.0.3...tic2@1.0.4) (2020-08-17)
+
+
+### ✨　Features
+
+* add disableLeastRecentlyMode ([240320a](https://github.com/bluelovers/ws-timer/commit/240320a688064d0dba2b22f2cd44a3c0addd1573))
+
+
+
+
+
 ## [1.0.3](https://github.com/bluelovers/ws-timer/compare/tic2@1.0.2...tic2@1.0.3) (2020-08-15)
 
 
