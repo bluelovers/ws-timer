@@ -11,16 +11,31 @@ import { nextAt } from './lib/nextAt';
 import { positiveNumber, isPositiveNumber } from './lib/positiveNumber';
 import { IThing, IThingInput } from './lib/types';
 import { ITSResolvable } from 'ts-type/lib/generic';
+import { LeastRecentlyMap } from 'least-recently-record/map';
 
 export class Tic
 {
-	protected _things = new Map<number, IThing<any[]>>();
+	protected _things: Map<number, IThing<any[]>>;
 	protected _dt = -1;
 	protected _id = 0;
 	protected _next: number;
 
 	protected _now: number = 0;
 	#_timestamp_base: number;
+
+	constructor(options?: {
+		disableLeastRecentlyMode?: boolean,
+	})
+	{
+		if (options?.disableLeastRecentlyMode)
+		{
+			this._things = new Map();
+		}
+		else
+		{
+			this._things = new LeastRecentlyMap();
+		}
+	}
 
 	get now()
 	{
@@ -149,6 +164,8 @@ export class Tic
 						thing.at += thing.timeout;
 
 						_next = nextAt(_next, thing.at);
+
+						this._things.set(key, thing);
 					}
 					else
 					{
@@ -162,7 +179,6 @@ export class Tic
 					_next = nextAt(_next, thing.at);
 				}
 			}
-			;
 
 			this._next = _next;
 

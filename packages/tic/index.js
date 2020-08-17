@@ -25,13 +25,19 @@ exports.Tic = void 0;
 const index_1 = require("performance-now2/index");
 const nextAt_1 = require("./lib/nextAt");
 const positiveNumber_1 = require("./lib/positiveNumber");
+const map_1 = require("least-recently-record/map");
 class Tic {
-    constructor() {
-        this._things = new Map();
+    constructor(options) {
         this._dt = -1;
         this._id = 0;
         this._now = 0;
         __timestamp_base.set(this, void 0);
+        if (options === null || options === void 0 ? void 0 : options.disableLeastRecentlyMode) {
+            this._things = new Map();
+        }
+        else {
+            this._things = new map_1.LeastRecentlyMap();
+        }
     }
     get now() {
         return this._now;
@@ -115,6 +121,7 @@ class Tic {
                         thing.elapsed = _now;
                         thing.at += thing.timeout;
                         _next = nextAt_1.nextAt(_next, thing.at);
+                        this._things.set(key, thing);
                     }
                     else {
                         this._things.delete(key);
@@ -125,7 +132,6 @@ class Tic {
                     _next = nextAt_1.nextAt(_next, thing.at);
                 }
             }
-            ;
             this._next = _next;
             if (_bool === true) {
                 _now = _next !== null && _next !== void 0 ? _next : _now;

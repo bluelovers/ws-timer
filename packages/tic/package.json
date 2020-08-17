@@ -33,6 +33,7 @@
     }
   ],
   "dependencies": {
+    "least-recently-record": "^1.0.1",
     "performance-now2": "^1.0.2",
     "ts-type": "^1.2.32"
   },

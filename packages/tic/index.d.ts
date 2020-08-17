@@ -6,6 +6,9 @@ export declare class Tic {
     protected _id: number;
     protected _next: number;
     protected _now: number;
+    constructor(options?: {
+        disableLeastRecentlyMode?: boolean;
+    });
     get now(): number;
     protected _stack<T extends any[]>(thing: IThingInput<T>): () => boolean;
     interval<T extends any[]>(fn: IThing<T>["fn"], timeout: number, ...args: T): () => boolean;
