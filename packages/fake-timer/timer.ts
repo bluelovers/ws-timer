@@ -2,15 +2,18 @@
  * Created by user on 2017/11/10/010.
  */
 
-import moment from 'moment';
+import dayjs from 'dayjs';
+import duration from 'dayjs/plugin/duration';
 import { QueueTimer, ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData } from './queue';
-import { autobind, readonly, nonconfigurable, coreDecorators } from './lib/decorators';
+import { toDuration } from './lib/time';
+
+dayjs.extend(duration);
 
 export interface ITimerFunc extends Function
 {
-	(callback: ICallback, delay: number, ...params);
+	(callback: ICallback, delay: number, ...params: any[]);
 
-	(callback: ICallback, delay: moment.Duration, ...params);
+	(callback: ICallback, delay: duration.Duration, ...params: any[]);
 }
 
 export interface ITimer
@@ -18,10 +21,9 @@ export interface ITimer
 	setTimeout: ITimerFunc;
 	setInterval: ITimerFunc;
 
-	setImmediate(callback: ICallback, ...params);
+	setImmediate(callback: ICallback, ...params: any[]);
 }
 
-@autobind
 export class Timer implements ITimer
 {
 
@@ -35,45 +37,45 @@ export class Timer implements ITimer
 		this.timer = QueueTimer.new(options);
 	}
 
-	async setTimeout(callback: ICallback, delay: number | moment.Duration, ...params)
+	setTimeout = async (callback: ICallback, delay: number | duration.Duration, ...params: any[]) =>
 	{
 		let q = this.timer.add({
 			callback: callback,
-			timing: moment.duration(delay),
+			timing: toDuration(delay),
 			params: params,
 			type: 'setTimeout',
 		});
 
 		return q;
-	}
+	};
 
-	async setInterval(callback: ICallback, delay: number | moment.Duration, ...params)
+	setInterval = async (callback: ICallback, delay: number | duration.Duration, ...params: any[]) =>
 	{
 		let q = this.timer.add({
 			callback: callback,
-			timing: moment.duration(delay),
+			timing: toDuration(delay),
 			params: params,
 			type: 'setInterval',
 		});
 
 		return q;
-	}
+	};
 
-	async setImmediate(callback: ICallback, ...params)
+	setImmediate = async (callback: ICallback, ...params: any[]) =>
 	{
 		let q = this.timer.add({
 			callback: callback,
-			timing: moment.duration(0),
+			timing: dayjs.duration(0),
 			params: params,
 			type: 'setImmediate',
 		});
 
 		return q;
-	}
+	};
 
-	async start(amount?: number | moment.Duration)
+	start = async (amount?: number | duration.Duration) =>
 	{
-		if (amount < 0)
+		if ((amount as number) < 0)
 		{
 			amount = this.timer.cache.min;
 		}
@@ -87,9 +89,9 @@ export class Timer implements ITimer
 		}
 
 		return this;
-	}
+	};
 
-	async run()
+	run = async () =>
 	{
 		let now = this.timer.now();
 
@@ -101,12 +103,12 @@ export class Timer implements ITimer
 
 			if (now.diff(current.timing) >= 0)
 			{
-				current.active = moment();
+				current.active = dayjs();
 				await current.callback(current, this.timer);
 
 				this.timer.remove(idx);
 
-				current.ending = moment();
+				current.ending = dayjs();
 				this.cache.done.push(current);
 			}
 			else
@@ -118,7 +120,7 @@ export class Timer implements ITimer
 		this.timer._cache_refresh();
 
 		return this;
-	}
+	};
 }
 
 export const init = new Timer();
@@ -128,4 +130,3 @@ export default init;
 export const setTimeout = init.setTimeout;
 export const setInterval = init.setInterval;
 export const setImmediate = init.setImmediate;
-

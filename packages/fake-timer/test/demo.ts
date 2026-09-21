@@ -2,8 +2,8 @@
  * Created by user on 2017/11/10/010.
  */
 
-import timerScope, { setTimeout, setImmediate } from '../scope';
-import * as moment from 'moment';
+import timerScope, { setTimeout, setImmediate } from '../timer';
+import dayjs from 'dayjs';
 
 setTimeout(function (current, timer, self)
 {
@@ -41,7 +41,7 @@ timerScope.start(-1)
 	})
 	.then((self) =>
 	{
-		console.log('[real]', moment().diff(self.timer.data.real_init), 'ms');
+		console.log('[real]', dayjs().diff(self.timer.data.real_init), 'ms');
 		console.log('[fake]', self.timer.now().diff(self.timer.data.fake_init), 'ms');
 	})
 ;

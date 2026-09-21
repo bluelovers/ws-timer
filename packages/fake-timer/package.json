@@ -28,8 +28,9 @@
     "test": "test"
   },
   "scripts": {
-    "coverage": "pnpm run test --coverage",
-    "test": "echo node --run test:jest --",
+    "pretest": "tsc --noEmit & echo Typescript checked",
+    "test": "node --run test:node",
+    "test:node": "tsx --test test/*.node-test.ts",
     "test:jest": "jest --passWithNoTests",
     "test:jest:coverage": "node --run test:jest -- --coverage",
     "test:jest:snapshot": "node --run test:jest -- -u",
@@ -45,7 +46,7 @@
   },
   "dependencies": {
     "dayjs": "^1.11.23",
-    "nanoid": "^6.0.1"
+    "nanoid": "<6 >=3.3.19"
   },
   "devDependencies": {
     "shuffle-array": "^1.0.1",

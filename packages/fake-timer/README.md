@@ -3,7 +3,7 @@ Fake Timer API for node.js.
 
 ```javascript
 import init, { setTimeout, setImmediate } from 'fake-timer';
-import * as moment from 'moment';
+import dayjs from 'dayjs';
 
 setTimeout(() => {}, 1500);
 let q = setTimeout(() => {}, 500);
@@ -30,7 +30,7 @@ init.start(-1)
 	})
 	.then((self) =>
 	{
-		console.log('[real]', moment().diff(self.timer.data.real_init), 'ms');
+		console.log('[real]', dayjs().diff(self.timer.data.real_init), 'ms');
 		console.log('[fake]', self.timer.now().diff(self.timer.data.fake_init), 'ms');
 	})
 ;

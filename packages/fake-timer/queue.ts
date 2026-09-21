@@ -2,21 +2,23 @@
  * Created by user on 2017/11/10/010.
  */
 
-import moment from 'moment';
-import shortid from 'shortid';
+import dayjs from 'dayjs';
+import duration from 'dayjs/plugin/duration';
+import minMax from 'dayjs/plugin/minMax';
+import { nanoid } from 'nanoid';
 import { Time, ITimeData as ITimeData2 } from './lib/time';
-import { autobind } from './lib/decorators';
 
-import * as array_shuffle from 'shuffle-array';
+dayjs.extend(duration);
+dayjs.extend(minMax);
 
-export type vMoment = moment.Moment | moment.Duration;
+export type vMoment = dayjs.Dayjs | duration.Duration;
 
 export interface ITimeQueueItem
 {
 	id?: number;
-	timing?: moment.Moment;
-	active?: moment.Moment;
-	ending?: moment.Moment;
+	timing?: dayjs.Dayjs;
+	active?: dayjs.Dayjs;
+	ending?: dayjs.Dayjs;
 
 	name?: string;
 	callback?: ICallback;
@@ -28,7 +30,7 @@ export interface ITimeQueueItem
 
 export interface ITimeQueueItemAdd extends ITimeQueueItem
 {
-	timing?: moment.Moment | moment.Duration | any;
+	timing?: dayjs.Dayjs | duration.Duration | any;
 }
 
 export interface ITimeData extends ITimeData2
@@ -44,7 +46,7 @@ export interface ISortCallback extends Function
 export interface ISetTimeout extends Function
 {
 	(callback: ICallback, delay: number, immediate: boolean);
-	(callback: ICallback, delay: moment.Duration, immediate: boolean);
+	(callback: ICallback, delay: duration.Duration, immediate: boolean);
 }
 
 export interface ICallback extends Function
@@ -52,7 +54,6 @@ export interface ICallback extends Function
 	(current: ITimeQueueItem, timer: QueueTimer, self?)
 }
 
-@autobind
 export class QueueTimer extends Time
 {
 	public queue = [] as ITimeQueueItem[];
@@ -61,7 +62,7 @@ export class QueueTimer extends Time
 		max: null,
 	} as any;
 
-	public data: ITimeData;
+	public override data: ITimeData;
 
 	constructor()
 	{
@@ -75,7 +76,7 @@ export class QueueTimer extends Time
 		return this.queue.length;
 	}
 
-	add(q: ITimeQueueItemAdd)
+	add = (q: ITimeQueueItemAdd): ITimeQueueItem =>
 	{
 		q.timing = q.timing || this.now();
 
@@ -85,8 +86,8 @@ export class QueueTimer extends Time
 			timing: null,
 		}, q, {
 			id: this.id(),
-			name: shortid(),
-			timing: moment.isDuration(q.timing) ? this.now().add(q.timing) : q.timing.clone(),
+			name: nanoid(),
+			timing: dayjs.isDuration(q.timing) ? this.now().add(q.timing) : q.timing,
 			index: this.length,
 		});
 
@@ -95,15 +96,15 @@ export class QueueTimer extends Time
 		this.queue.push(q as ITimeQueueItem);
 
 		return q as ITimeQueueItem;
-	}
+	};
 
-	_cache_refresh()
+	_cache_refresh = (): void =>
 	{
 		this.cache.min = this.length ? this.eq(0).timing : null;
 		this.cache.max = this.length ? this.eq(-1).timing : null;
-	}
+	};
 
-	_cache_timing(timing, reset?: boolean)
+	_cache_timing = (timing, reset?: boolean): void =>
 	{
 		if (reset)
 		{
@@ -111,11 +112,11 @@ export class QueueTimer extends Time
 			this.cache.min = null;
 		}
 
-		this.cache.max = this.cache.max ? moment.max(this.cache.max, timing) : timing;
-		this.cache.min = this.cache.min ? moment.min(this.cache.min, timing) : timing;
-	}
+		this.cache.max = this.cache.max ? dayjs.max(this.cache.max, timing) : timing;
+		this.cache.min = this.cache.min ? dayjs.min(this.cache.min, timing) : timing;
+	};
 
-	sort(cb?: ISortCallback)
+	sort = (cb?: ISortCallback): this =>
 	{
 		let self = this;
 
@@ -131,9 +132,9 @@ export class QueueTimer extends Time
 		});
 
 		return this;
-	}
+	};
 
-	eq(idx: number)
+	eq = (idx: number): ITimeQueueItem =>
 	{
 		if (idx == -1)
 		{
@@ -141,9 +142,9 @@ export class QueueTimer extends Time
 		}
 
 		return this.queue[idx];
-	}
+	};
 
-	protected _remove(idx)
+	protected _remove = (idx): ITimeQueueItem | null =>
 	{
 		let q = this.queue.splice(idx, 1);
 
@@ -155,9 +156,9 @@ export class QueueTimer extends Time
 		}
 
 		return null;
-	}
+	};
 
-	remove(id: number | string | ITimeQueueItem): null | ITimeQueueItem
+	remove = (id: number | string | ITimeQueueItem): null | ITimeQueueItem =>
 	{
 		//console.log(typeof id, id);
 
@@ -182,7 +183,7 @@ export class QueueTimer extends Time
 		}
 
 		return null;
-	}
+	};
 
 	// @ts-ignore
 	static new(options?: ITimeData)
@@ -190,12 +191,12 @@ export class QueueTimer extends Time
 		return super.new() as QueueTimer;
 	}
 
-	hasExpires()
+	hasExpires = (): boolean =>
 	{
 		let d = this.now().diff(this.cache.min);
 
 		return (d >= 0);
-	}
+	};
 }
 
 export default QueueTimer;

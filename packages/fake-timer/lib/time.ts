@@ -2,16 +2,24 @@
  * Created by user on 2017/11/10/010.
  */
 
-import moment from 'moment';
+import dayjs from 'dayjs';
+import duration from 'dayjs/plugin/duration';
+
+dayjs.extend(duration);
+
+export function toDuration(value: number | duration.Duration): duration.Duration
+{
+	return dayjs.isDuration(value) ? value : dayjs.duration(value);
+}
 
 export interface ITimeData
 {
 	id?: number;
-	real_init?: moment.Moment;
+	real_init?: dayjs.Dayjs;
 
-	fake_init?: moment.Moment;
-	fake_now?: moment.Moment;
-	fake_old?: moment.Moment;
+	fake_init?: dayjs.Dayjs;
+	fake_now?: dayjs.Dayjs;
+	fake_old?: dayjs.Dayjs;
 }
 
 export class Time
@@ -27,11 +35,13 @@ export class Time
 			[options, now] = [{}, options];
 		}
 
+		now = dayjs(now);
+
 		this.data = Object.assign(this.data, {
 			id: 0,
-			real_init: moment(),
-			fake_init: moment(now),
-			fake_now: moment(now),
+			real_init: dayjs(),
+			fake_init: now,
+			fake_now: now,
 		}, options);
 
 		this._init();
@@ -39,13 +49,7 @@ export class Time
 
 	_init()
 	{
-		for (let i in this.data)
-		{
-			if (this.data[i] instanceof moment)
-			{
-				this.data[i] = this.data[i].clone();
-			}
-		}
+		// dayjs is immutable, no clone needed
 	}
 
 	static new(options?: ITimeData)
@@ -63,11 +67,11 @@ export class Time
 
 	static isValidDate(who)
 	{
-		if (who instanceof moment || who instanceof Date)
+		if (dayjs.isDayjs(who) || who instanceof Date)
 		{
 			return true;
 		}
-		else if (typeof who == 'number' && moment(who).isValid())
+		else if (typeof who == 'number' && dayjs(who).isValid())
 		{
 			return true;
 		}
@@ -79,26 +83,25 @@ export class Time
 		return false;
 	}
 
-	update(amount: any = 100, unit?: string)
+	update(amount: any = 100, unit?: dayjs.ManipulateType)
 	{
-		//this.data.real_update = moment();
-		this.data.fake_old = this.data.fake_now.clone();
+		this.data.fake_old = this.data.fake_now as dayjs.Dayjs;
 
-		if (moment.isDuration(amount))
+		if (dayjs.isDuration(amount))
 		{
-			this.data.fake_now.add(amount);
+			this.data.fake_now = (this.data.fake_now as dayjs.Dayjs).add(amount);
 		}
 		else if (typeof amount == 'object')
 		{
-			this.data.fake_now = moment(amount);
+			this.data.fake_now = dayjs(amount);
 		}
 		else if (unit || typeof amount == 'number')
 		{
-			this.data.fake_now.add(amount, unit);
+			this.data.fake_now = (this.data.fake_now as dayjs.Dayjs).add(amount, unit);
 		}
 		else
 		{
-			this.data.fake_now.add(100);
+			this.data.fake_now = (this.data.fake_now as dayjs.Dayjs).add(100);
 		}
 
 		return this;
@@ -109,12 +112,10 @@ export class Time
 		return bool ? this.data.id : this.data.id++;
 	}
 
-	now(): moment.Moment
+	now(): dayjs.Dayjs
 	{
-		return this.data.fake_now.clone();
+		return this.data.fake_now as dayjs.Dayjs;
 	}
 }
 
 export default Time;
-
-

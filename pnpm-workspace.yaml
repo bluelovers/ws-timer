@@ -25,3 +25,5 @@ preferWorkspacePackages: true
 
 # onlyBuiltDependencies: []
 # ignoredBuiltDependencies: []
+allowBuilds:
+  esbuild: true
