@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.5](https://github.com/bluelovers/ws-timer/compare/tic2@1.0.4...tic2@1.0.5) (2026-09-21)
+
+
+
+### 🛠　Build System
+
+* **workspace:** 從 yarn 切換至 pnpm 並更新工作區配置 ([3d6dd52](https://github.com/bluelovers/ws-timer/commit/3d6dd5213fbf0ce7bf9ed768935b9732fa80f841))
+
+
+### ♻️　Chores
+
+* **deps:** 暫時停用 perfnow 與 tic 的測試指令 ([1734992](https://github.com/bluelovers/ws-timer/commit/1734992473b6d11a6586c9768e0e30b5f478185e))
+
+
+
 ## [1.0.4](https://github.com/bluelovers/ws-timer/compare/tic2@1.0.3...tic2@1.0.4) (2020-08-17)
 
 

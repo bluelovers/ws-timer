@@ -62,7 +62,7 @@ importers:
         specifier: ^1.0.2
         version: 1.0.2
       performance-now2:
-        specifier: ^1.0.3
+        specifier: ^1.0.4
         version: link:../perfnow
       ts-type:
         specifier: ^3.0.13
