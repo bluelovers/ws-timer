@@ -2,7 +2,7 @@
  * Created by user on 2017/11/10/010.
  */
 
-import timerScope, { setTimeout, setImmediate } from '../timer';
+import timerScope, { setTimeout, setImmediate } from '../src/timer';
 import dayjs from 'dayjs';
 
 setTimeout(function (current, timer, self)

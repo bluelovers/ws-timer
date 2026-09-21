@@ -5,7 +5,7 @@
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import { QueueTimer, ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData } from './queue';
-import { toDuration } from './lib/time';
+import { toDuration } from './time';
 
 dayjs.extend(duration);
 

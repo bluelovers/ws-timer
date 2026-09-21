@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import minMax from 'dayjs/plugin/minMax';
 import { nanoid } from 'nanoid';
-import { Time, ITimeData as ITimeData2 } from './lib/time';
+import { Time, ITimeData as ITimeData2 } from './time';
 
 dayjs.extend(duration);
 dayjs.extend(minMax);

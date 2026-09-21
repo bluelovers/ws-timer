@@ -10,9 +10,9 @@ import duration from 'dayjs/plugin/duration';
 
 dayjs.extend(duration);
 
-import { Timer, init, setTimeout as fakeSetTimeout, setImmediate as fakeSetImmediate } from '../timer';
-import { QueueTimer } from '../queue';
-import { Time } from '../lib/time';
+import { Timer, init, setTimeout as fakeSetTimeout, setImmediate as fakeSetImmediate } from '../src/timer';
+import { QueueTimer } from '../src/queue';
+import { Time } from '../src/time';
 
 describe('Time', () =>
 {
