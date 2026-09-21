@@ -53,7 +53,7 @@
     "test:node": "tsx --test test/*.node-test.ts",
     "test:snapshot": "pnpm run test -u",
     "test:tsd": "ynpx tsd",
-    "posttest": "yarn run build",
+    "posttest": "pnpm run build",
     "build": "node --run build:tsdx && node --run build:dts:bundle",
     "build:dts:bundle": "ynpx @bluelovers/dts-bundle-generator -o ./dist/index.d.ts ./src/index.ts --no-banner --inline-declare-global & echo build:dts:bundle",
     "build:dts:copy": "copy .\\src\\index.d.ts .\\dist\\index.d.ts & echo build:dts",

@@ -6,6 +6,10 @@ import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import { QueueTimer, ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData } from './queue';
 import { toDuration } from './time';
+import { TimeCore } from './time';
+
+export { QueueTimer };
+export { TimeCore };
 
 dayjs.extend(duration);
 
@@ -45,7 +49,7 @@ export interface ITimer
  * Wraps QueueTimer and provides an API identical to native setTimeout / setInterval / setImmediate.
  * Time is advanced manually via start(), triggering expired callbacks.
  */
-export class Timer implements ITimer
+export class FakeTimer implements ITimer
 {
 
 	/** 底層佇列計時器實例 / Underlying queue timer instance */
@@ -226,29 +230,31 @@ export class Timer implements ITimer
  * 預設的全域 Timer 實例
  * Default global Timer instance
  */
-export const init = new Timer();
+export const defaultFakeTimer = new FakeTimer();
 
-export default init;
+export default defaultFakeTimer;
 
 /** 便捷匯出：直接使用全域 Timer 的 setTimeout / Convenience export: use global Timer's setTimeout */
-export const setTimeout = init.setTimeout;
+export const setTimeout = defaultFakeTimer.setTimeout;
 
 /** 便捷匯出：直接使用全域 Timer 的 setInterval / Convenience export: use global Timer's setInterval */
-export const setInterval = init.setInterval;
+export const setInterval = defaultFakeTimer.setInterval;
 
 /** 便捷匯出：直接使用全域 Timer 的 setImmediate / Convenience export: use global Timer's setImmediate */
-export const setImmediate = init.setImmediate;
+export const setImmediate = defaultFakeTimer.setImmediate;
 
 // @ts-ignore
 if (process.env.TSDX_FORMAT !== 'esm')
 {
-	Object.defineProperty(init, "__esModule", { value: true });
+	Object.defineProperty(defaultFakeTimer, "__esModule", { value: true });
 
-	Object.defineProperty(init, "default", { value: init });
-	Object.defineProperty(init, "Timer", { value: Timer });
-	Object.defineProperty(init, "QueueTimer", { value: QueueTimer });
+	Object.defineProperty(defaultFakeTimer, "default", { value: defaultFakeTimer });
+	Object.defineProperty(defaultFakeTimer, "FakeTimer", { value: FakeTimer });
 
-	Object.defineProperty(init, "setTimeout", { value: setTimeout });
-	Object.defineProperty(init, "setInterval", { value: setInterval });
-	Object.defineProperty(init, "setImmediate", { value: setImmediate });
+	Object.defineProperty(defaultFakeTimer, "QueueTimer", { value: QueueTimer });
+	Object.defineProperty(defaultFakeTimer, "TimeCore", { value: TimeCore });
+
+	Object.defineProperty(defaultFakeTimer, "setTimeout", { value: setTimeout });
+	Object.defineProperty(defaultFakeTimer, "setInterval", { value: setInterval });
+	Object.defineProperty(defaultFakeTimer, "setImmediate", { value: setImmediate });
 }

@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import minMax from 'dayjs/plugin/minMax';
 import { nanoid } from 'nanoid';
-import { Time, ITimeData as ITimeData2 } from './time';
+import { TimeCore, ITimeData as ITimeData2 } from './time';
 
 dayjs.extend(duration);
 dayjs.extend(minMax);
@@ -108,7 +108,7 @@ export interface ICallback extends Function
  * Manages a time-sorted queue, supporting add, remove, sort, and expiry check operations.
  * All timer items are stored in the queue array, with min/max times tracked via cache for performance.
  */
-export class QueueTimer extends Time
+export class QueueTimer extends TimeCore
 {
 	/** 計時器佇列 / Timer queue */
 	public queue = [] as ITimeQueueItem[];

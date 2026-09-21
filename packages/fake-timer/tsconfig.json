@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "rootDir": "src",
     "noPropertyAccessFromIndexSignature": false,
+    "noUnusedLocals": false,
     "noImplicitAny": false,
     "types": [
       "node"

@@ -10,15 +10,15 @@ import duration from 'dayjs/plugin/duration';
 
 dayjs.extend(duration);
 
-import { Timer, init, setTimeout as fakeSetTimeout, setImmediate as fakeSetImmediate } from '../src/timer';
+import { FakeTimer as Timer, defaultFakeTimer as init, setTimeout as fakeSetTimeout, setImmediate as fakeSetImmediate } from '../src/index';
 import { QueueTimer } from '../src/queue';
-import { Time } from '../src/time';
+import { TimeCore } from '../src/time';
 
 describe('Time', () =>
 {
 	it('should create with default data', () =>
 	{
-		const t = new Time();
+		const t = new TimeCore();
 
 		assert.ok(t.data.real_init.isValid());
 		assert.ok(t.data.fake_init.isValid());
@@ -29,14 +29,14 @@ describe('Time', () =>
 	it('should create with custom date', () =>
 	{
 		const customDate = new Date('2020-01-01');
-		const t = new Time(customDate as any);
+		const t = new TimeCore(customDate as any);
 
 		assert.ok(t.data.fake_init.isValid());
 	});
 
 	it('should handle dayjs objects as immutable', () =>
 	{
-		const t = new Time();
+		const t = new TimeCore();
 		const original = t.data.fake_now;
 		const mutated = t.data.fake_now.add(1000);
 
@@ -47,7 +47,7 @@ describe('Time', () =>
 
 	it('now() should return immutable reference', () =>
 	{
-		const t = new Time();
+		const t = new TimeCore();
 		const a = t.now();
 		const b = t.now();
 
@@ -57,7 +57,7 @@ describe('Time', () =>
 
 	it('id() should auto increment', () =>
 	{
-		const t = new Time();
+		const t = new TimeCore();
 		const first = t.id();
 		const second = t.id();
 
@@ -67,7 +67,7 @@ describe('Time', () =>
 
 	it('id(true) should not increment', () =>
 	{
-		const t = new Time();
+		const t = new TimeCore();
 		const a = t.id(true);
 		const b = t.id(true);
 
@@ -77,7 +77,7 @@ describe('Time', () =>
 
 	it('update() should advance fake_now by milliseconds', () =>
 	{
-		const t = new Time();
+		const t = new TimeCore();
 		const before = t.now();
 
 		t.update(500);
@@ -88,7 +88,7 @@ describe('Time', () =>
 
 	it('update() with unit should advance by that unit', () =>
 	{
-		const t = new Time();
+		const t = new TimeCore();
 		const before = t.now();
 
 		t.update(2, 'second');
@@ -99,7 +99,7 @@ describe('Time', () =>
 
 	it('update() should store old value', () =>
 	{
-		const t = new Time();
+		const t = new TimeCore();
 		const before = t.now();
 
 		t.update(100);
@@ -110,11 +110,11 @@ describe('Time', () =>
 
 	it('isValidDate should validate various inputs', () =>
 	{
-		assert.equal(Time.isValidDate(new Date()), true);
-		assert.equal(Time.isValidDate(Date.now()), true);
-		assert.equal(Time.isValidDate('2020-01-01'), true);
-		assert.equal(Time.isValidDate('not-a-date'), false);
-		assert.equal(Time.isValidDate(null), false);
+		assert.equal(TimeCore.isValidDate(new Date()), true);
+		assert.equal(TimeCore.isValidDate(Date.now()), true);
+		assert.equal(TimeCore.isValidDate('2020-01-01'), true);
+		assert.equal(TimeCore.isValidDate('not-a-date'), false);
+		assert.equal(TimeCore.isValidDate(null), false);
 	});
 });
 
@@ -177,7 +177,7 @@ describe('QueueTimer', () =>
 
 		const last = q.eq(-1);
 
-		assert.equal(last.index, 1);
+		assert.equal(last['index'], 1);
 	});
 
 	it('remove by index should remove and return item', () =>
@@ -274,7 +274,7 @@ describe('Timer', () =>
 		const item = await t.setTimeout(() => {}, 1000);
 
 		assert.ok(item);
-		assert.equal(item.type, 'setTimeout');
+		assert.equal(item['type'], 'setTimeout');
 		assert.equal(t.timer.length, 1);
 	});
 
@@ -285,7 +285,7 @@ describe('Timer', () =>
 		const item = await t.setInterval(() => {}, 500);
 
 		assert.ok(item);
-		assert.equal(item.type, 'setInterval');
+		assert.equal(item['type'], 'setInterval');
 		assert.equal(t.timer.length, 1);
 	});
 
@@ -296,7 +296,7 @@ describe('Timer', () =>
 		const item = await t.setTimeout(() => {}, dayjs.duration(2000));
 
 		assert.ok(item);
-		assert.equal(item.type, 'setTimeout');
+		assert.equal(item['type'], 'setTimeout');
 		assert.equal(t.timer.length, 1);
 		assert.ok(item.timing.isValid());
 	});
@@ -308,7 +308,7 @@ describe('Timer', () =>
 		const item = await t.setInterval(() => {}, dayjs.duration(3000));
 
 		assert.ok(item);
-		assert.equal(item.type, 'setInterval');
+		assert.equal(item['type'], 'setInterval');
 		assert.equal(t.timer.length, 1);
 		assert.ok(item.timing.isValid());
 	});
@@ -330,7 +330,7 @@ describe('Timer', () =>
 		const item = await t.setImmediate(() => {});
 
 		assert.ok(item);
-		assert.equal(item.type, 'setImmediate');
+		assert.equal(item['type'], 'setImmediate');
 		assert.equal(t.timer.length, 1);
 	});
 

@@ -50,7 +50,7 @@ export interface ITimeData
  * This class is the core of the fake-timer, managing the mapping between real time and fake time.
  * The virtual time can be advanced arbitrarily via update() for testing or simulating timer behavior.
  */
-export class Time
+export class TimeCore
 {
 	/** 時間狀態資料 / Time state data */
 	public data = {} as ITimeData;
@@ -202,4 +202,4 @@ export class Time
 	}
 }
 
-export default Time;
+export default TimeCore;
