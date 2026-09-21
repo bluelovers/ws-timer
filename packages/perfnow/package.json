@@ -22,33 +22,41 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bluelovers/ws-timer.git"
+    "url": "git+https://github.com/bluelovers/ws-timer.git",
+    "directory": "packages/perfnow"
   },
   "license": "MIT",
   "author": "Daniel Lamb <dlamb.open.source@gmail.com> (https://github.com/daniellmb)",
+  "maintainers": [],
   "contributors": [],
   "main": "index.js",
   "directories": {
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\"",
-    "preversion": "yarn run test",
+    "coverage": "pnpm run test --coverage",
+    "test": "node --run test:jest --",
+    "test:jest": "jest --passWithNoTests",
+    "test:jest:coverage": "node --run test:jest -- --coverage",
+    "test:jest:snapshot": "node --run test:jest -- -u",
+    "test:snapshot": "pnpm run test -u",
+    "test:tsd": "ynpx tsd",
+    "preversion": "pnpm run test",
     "prepublishOnly_": "echo prepublishOnly",
     "prepublishOnly:check-bin": "ynpx --quiet @yarn-tool/check-pkg-bin",
-    "prepublishOnly:update": "yarn run ncu && yarn run sort-package-json",
+    "prepublishOnly:update": "pnpm run ncu && pnpm run sort-package-json",
     "ncu": "yarn-tool ncu -u",
-    "sort-package-json": "yarn-tool sort"
+    "sort-package-json": "yarn-tool sort",
+    "tsc:showConfig": "ynpx get-current-tsconfig -p"
   },
   "dependencies": {
-    "globalthis": "^1.0.1"
+    "globalthis": "^1.0.4"
   },
   "devDependencies": {
-    "@types/globalthis": "^1.0.1"
+    "@types/globalthis": "^1.0.4"
   },
   "peerDependencies": {
     "@types/node": "*"
   },
-  "maintainers": [],
   "gitHead": "52b30f8f5f879f211baf1505f30a2f0a84d526d5"
 }

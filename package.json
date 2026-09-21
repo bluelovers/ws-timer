@@ -3,41 +3,50 @@
   "version": "1.0.0",
   "private": true,
   "keywords": [],
+  "homepage": "https://github.com/bluelovers/ws-timer#readme",
+  "bugs": {
+    "url": "https://github.com/bluelovers/ws-timer/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bluelovers/ws-timer.git"
+  },
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
     "test": "yarn-tool ws run test",
-    "lerna:publish": "yarn run prepublishOnly:root && lerna publish && yarn run postpublishOnly",
-    "lerna:publish:yes": "yarn run prepublishOnly:root && lerna publish --yes --bump patch && yarn run postpublishOnly",
-    "preversion": "echo preversion",
-    "prepare:fix-ws-links": "ynpx --quiet @yarn-tool/fix-ws-links",
-    "prepublishOnly": "echo prepublishOnly",
-    "prepublishOnly:check-bin": "ynpx --quiet @yarn-tool/check-pkg-bin",
-    "prepublishOnly:lockfile": "ynpx --quiet sync-lockfile",
-    "prepublishOnly:root": "yarn run prepublishOnly:check-bin && yarn run prepare:fix-ws-links",
-    "postpublishOnly": "echo postpublishOnly",
-    "ncu": "yarn run ncu:root && yarn run ncu:ws",
-    "ncu:root": "yarn-tool ncu -u",
-    "ncu:ws": "yarn-tool ws exec yarn-tool ncu -- -u",
-    "sort-package-json": "yarn run sort-package-json:root && yarn run sort-package-json:ws",
-    "sort-package-json:root": "yarn-tool sort",
-    "sort-package-json:ws": "yarn-tool ws exec yarn-tool sort"
+    "test:all": "yarn-tool ws run test --concurrency 1",
+    "test:jest:clearCache": "jest --clearCache",
+    "test:since": "node --run test:all -- --since",
+    "test:snapshot:all": "yarn-tool ws run test:snapshot --concurrency 1",
+    "test:snapshot:since": "node --run test:snapshot:all -- --since",
+    "test:tsd:all": "yarn-tool ws run test:tsd --concurrency 1",
+    "test:tsd:since": "node --run test:tsd:all -- --since",
+    "build:all": "yarn-tool ws run build --concurrency 1",
+    "build:since": "node --run build:all -- --since",
+    "ci:install": "node --run ci:install:pnpm",
+    "ci:install:pnpm": "pnpm install --frozen-lockfile && pnpm add -w yarn-tool lerna ynpx pnpm typescript ts-node tsx ts-jest jest @bluelovers/jest-config @bluelovers/tsconfig @yarn-tool/require-resolve",
+    "ci:build": "echo ci:build",
+    "lerna:publish": "pnpm run prepublishOnly:root && lerna publish && pnpm run postpublishOnly",
+    "lerna:publish:yes": "pnpm run prepublishOnly:root && lerna publish --yes --bump patch && pnpm run postpublishOnly",
+    "lerna:publish:yes:force": "lerna publish --no-private --yes --bump patch --force-publish",
+    "lerna:publish:yes:major": "node --run prepublishOnly:root && lerna publish --no-private --yes --bump major && pnpm run postpublishOnly",
+    "lerna:publish:yes:minor": "node --run prepublishOnly:root && lerna publish --no-private --yes --bump minor && pnpm run postpublishOnly",
+    "lerna:publish:yes:patch": "node --run prepublishOnly:root && lerna publish --no-private --yes --bump patch && pnpm run postpublishOnly",
+    "ws:fix-all": "yarn-tool fix-all --overwriteHostedGitInfo",
+    "ws:fix-all:resetStaticFiles": "node --run ws:fix-all -- --resetStaticFiles",
+    "version": "echo version",
+    "postpublishOnly:ws-root-changelog": "ynpx ws-root-changelog & git add ./CHANGELOG.md & git commit ./CHANGELOG.md -m \"chore(changelog): update changelog toc in workspaces root\" & echo update changelog toc in workspaces root",
+    "ncu": "pnpm run ncu:root && pnpm run ncu:ws",
+    "ncu:ws": "arn-tool ncu -u --AA",
+    "ncu:root": "yarn-tool ncu -u"
   },
-  "resolutions": {},
   "devDependencies": {
-    "@bluelovers/tsconfig": "^1.0.20",
-    "@types/jest": "^26.0.10",
-    "@types/node": "*"
-  },
-  "peerDependencies": {
-    "@bluelovers/conventional-changelog-bluelovers": "*",
-    "lerna": "*",
-    "yarn": "*",
-    "ynpx": "*"
-  },
-  "dependencies": {
-    "jest": "^26.4.0",
-    "ts-jest": "^26.2.0"
+    "@bluelovers/tsconfig": "^2.0.3",
+    "@types/jest": "^30.0.0",
+    "@types/node": "*",
+    "@yarn-tool/require-resolve": "*",
+    "@yarn-tool/ws-find-up-paths": "*"
   }
 }
