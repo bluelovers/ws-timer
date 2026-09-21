@@ -15,9 +15,9 @@ dayjs.extend(duration);
  */
 export interface ITimerFunc extends Function
 {
-	(callback: ICallback, delay: number, ...params: any[]);
+	(callback: ICallback, delay: number, ...params: any[]): Promise<ITimeQueueItem>;
 
-	(callback: ICallback, delay: duration.Duration, ...params: any[]);
+	(callback: ICallback, delay: duration.Duration, ...params: any[]): Promise<ITimeQueueItem>;
 }
 
 /**
@@ -33,7 +33,7 @@ export interface ITimer
 	setInterval: ITimerFunc;
 
 	/** 模擬原生 setImmediate / Simulate native setImmediate */
-	setImmediate(callback: ICallback, ...params: any[]);
+	setImmediate(callback: ICallback, ...params: any[]): Promise<ITimeQueueItem>;
 }
 
 /**
@@ -238,3 +238,17 @@ export const setInterval = init.setInterval;
 
 /** 便捷匯出：直接使用全域 Timer 的 setImmediate / Convenience export: use global Timer's setImmediate */
 export const setImmediate = init.setImmediate;
+
+// @ts-ignore
+if (process.env.TSDX_FORMAT !== 'esm')
+{
+	Object.defineProperty(init, "__esModule", { value: true });
+
+	Object.defineProperty(init, "default", { value: init });
+	Object.defineProperty(init, "Timer", { value: Timer });
+	Object.defineProperty(init, "QueueTimer", { value: QueueTimer });
+
+	Object.defineProperty(init, "setTimeout", { value: setTimeout });
+	Object.defineProperty(init, "setInterval", { value: setInterval });
+	Object.defineProperty(init, "setImmediate", { value: setImmediate });
+}
