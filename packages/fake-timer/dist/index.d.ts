@@ -17,7 +17,16 @@ export interface ITimeData {
 	/** 上一次 update 前的虛擬時間（用於回溯或差值計算） / Fake time before last update (used for rollback or diff calculation) */
 	fake_old?: dayjs.Dayjs;
 }
-declare class Time {
+/**
+ * 時間基礎類別，提供可控的虛擬時間環境
+ * Base time class providing a controllable fake time environment
+ *
+ * 此類別是整個 fake-timer 的核心，管理真實時間與虛擬時間的映射。
+ * 透過 update() 方法可任意推進虛擬時間，用於測試或模擬計時器行為。
+ * This class is the core of the fake-timer, managing the mapping between real time and fake time.
+ * The virtual time can be advanced arbitrarily via update() for testing or simulating timer behavior.
+ */
+export declare class TimeCore {
 	/** 時間狀態資料 / Time state data */
 	data: ITimeData;
 	/**
@@ -36,7 +45,7 @@ declare class Time {
 	 * 工廠方法，建立 Time 實例
 	 * Factory method to create a Time instance
 	 */
-	static new(options?: ITimeData): Time;
+	static new(options?: ITimeData): TimeCore;
 	/**
 	 * 取得當前類別的建構函式（用於 static 方法中引用子類）
 	 * Get the constructor of the current class (used in static methods to reference subclasses)
@@ -129,7 +138,16 @@ export interface ISortCallback extends Function {
 export interface ICallback extends Function {
 	(current: ITimeQueueItem, timer: QueueTimer, self?: any): any;
 }
-declare class QueueTimer extends Time {
+/**
+ * 佇列式計時器，繼承 Time 類別
+ * Queue-based timer, extends the Time class
+ *
+ * 管理一個按時間排序的佇列，支援新增、移除、排序、到期檢查等操作。
+ * 所有計時器項目都存放在 queue 陣列中，並透過 cache 追蹤最小與最大時間以提升效能。
+ * Manages a time-sorted queue, supporting add, remove, sort, and expiry check operations.
+ * All timer items are stored in the queue array, with min/max times tracked via cache for performance.
+ */
+export declare class QueueTimer extends TimeCore {
 	/** 計時器佇列 / Timer queue */
 	queue: ITimeQueueItem[];
 	/** 快取佇列中的最小與最大時間 / Cache for min and max times in the queue */
@@ -252,7 +270,7 @@ export interface ITimer {
  * Wraps QueueTimer and provides an API identical to native setTimeout / setInterval / setImmediate.
  * Time is advanced manually via start(), triggering expired callbacks.
  */
-export declare class Timer implements ITimer {
+export declare class FakeTimer implements ITimer {
 	/** 底層佇列計時器實例 / Underlying queue timer instance */
 	timer: QueueTimer;
 	/** 已完成的佇列項目快取 / Cache for completed queue items */
@@ -320,7 +338,7 @@ export declare class Timer implements ITimer {
  * 預設的全域 Timer 實例
  * Default global Timer instance
  */
-export declare const init: Timer;
+export declare const defaultFakeTimer: FakeTimer;
 /** 便捷匯出：直接使用全域 Timer 的 setTimeout / Convenience export: use global Timer's setTimeout */
 declare const setTimeout$1: (callback: ICallback, delay: number | duration.Duration, ...params: any[]) => Promise<ITimeQueueItem>;
 /** 便捷匯出：直接使用全域 Timer 的 setInterval / Convenience export: use global Timer's setInterval */
@@ -329,7 +347,7 @@ declare const setInterval$1: (callback: ICallback, delay: number | duration.Dura
 declare const setImmediate$1: (callback: ICallback, ...params: any[]) => Promise<ITimeQueueItem>;
 
 export {
-	init as default,
+	defaultFakeTimer as default,
 	setImmediate$1 as setImmediate,
 	setInterval$1 as setInterval,
 	setTimeout$1 as setTimeout,

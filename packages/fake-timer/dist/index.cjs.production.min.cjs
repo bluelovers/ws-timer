@@ -8,7 +8,7 @@ function toDuration(t) {
 
 e.extend(t);
 
-class Time {
+class TimeCore {
   data={};
   constructor(t) {
     let i;
@@ -43,7 +43,7 @@ class Time {
 
 e.extend(t), e.extend(i);
 
-class QueueTimer extends Time {
+class QueueTimer extends TimeCore {
   queue=[];
   cache={
     min: null,
@@ -100,7 +100,7 @@ function queueSortCallback(e, t) {
 
 e.extend(t);
 
-class Timer {
+class FakeTimer {
   cache={
     done: []
   };
@@ -140,7 +140,7 @@ class Timer {
   };
 }
 
-const n = /*#__PURE__*/ new Timer;
+const n = /*#__PURE__*/ new FakeTimer;
 
 var s = n;
 
@@ -150,10 +150,12 @@ Object.defineProperty(n, "__esModule", {
   value: !0
 }), Object.defineProperty(n, "default", {
   value: n
-}), Object.defineProperty(n, "Timer", {
-  value: Timer
+}), Object.defineProperty(n, "FakeTimer", {
+  value: FakeTimer
 }), Object.defineProperty(n, "QueueTimer", {
   value: QueueTimer
+}), Object.defineProperty(n, "TimeCore", {
+  value: TimeCore
 }), Object.defineProperty(n, "setTimeout", {
   value: r
 }), Object.defineProperty(n, "setInterval", {

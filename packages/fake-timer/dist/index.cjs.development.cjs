@@ -9,7 +9,7 @@ dayjs.extend(duration);
 function toDuration(value) {
   return dayjs.isDuration(value) ? value : dayjs.duration(value);
 }
-class Time {
+class TimeCore {
   data = {};
   /**
    * 建立 Time 實例
@@ -88,7 +88,7 @@ dayjs.extend(minMax);
  * @param timer - 所屬的 QueueTimer 實例 / The owning QueueTimer instance
  */
 
-class QueueTimer extends Time {
+class QueueTimer extends TimeCore {
   queue = [];
   cache = {
     min: null,
@@ -210,7 +210,7 @@ function queueSortCallback(a, b) {
 }
 
 dayjs.extend(duration);
-class Timer {
+class FakeTimer {
   cache = {
     done: []
   };
@@ -324,32 +324,35 @@ class Timer {
     return this;
   };
 }
-const init = /*#__PURE__*/new Timer();
-var _ = init;
-const setTimeout = init.setTimeout;
-const setInterval = init.setInterval;
-const setImmediate = init.setImmediate;
+const defaultFakeTimer = /*#__PURE__*/new FakeTimer();
+var _ = defaultFakeTimer;
+const setTimeout = defaultFakeTimer.setTimeout;
+const setInterval = defaultFakeTimer.setInterval;
+const setImmediate = defaultFakeTimer.setImmediate;
 // @ts-ignore
 {
-  Object.defineProperty(init, "__esModule", {
+  Object.defineProperty(defaultFakeTimer, "__esModule", {
     value: true
   });
-  Object.defineProperty(init, "default", {
-    value: init
+  Object.defineProperty(defaultFakeTimer, "default", {
+    value: defaultFakeTimer
   });
-  Object.defineProperty(init, "Timer", {
-    value: Timer
+  Object.defineProperty(defaultFakeTimer, "FakeTimer", {
+    value: FakeTimer
   });
-  Object.defineProperty(init, "QueueTimer", {
+  Object.defineProperty(defaultFakeTimer, "QueueTimer", {
     value: QueueTimer
   });
-  Object.defineProperty(init, "setTimeout", {
+  Object.defineProperty(defaultFakeTimer, "TimeCore", {
+    value: TimeCore
+  });
+  Object.defineProperty(defaultFakeTimer, "setTimeout", {
     value: setTimeout
   });
-  Object.defineProperty(init, "setInterval", {
+  Object.defineProperty(defaultFakeTimer, "setInterval", {
     value: setInterval
   });
-  Object.defineProperty(init, "setImmediate", {
+  Object.defineProperty(defaultFakeTimer, "setImmediate", {
     value: setImmediate
   });
 }

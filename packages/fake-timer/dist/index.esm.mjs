@@ -12,7 +12,7 @@ function toDuration(i) {
 
 t.extend(i);
 
-class Time {
+class TimeCore {
   data={};
   constructor(i) {
     let e;
@@ -47,7 +47,7 @@ class Time {
 
 t.extend(i), t.extend(e);
 
-class QueueTimer extends Time {
+class QueueTimer extends TimeCore {
   queue=[];
   cache={
     min: null,
@@ -104,7 +104,7 @@ function queueSortCallback(t, i) {
 
 t.extend(i);
 
-class Timer {
+class FakeTimer {
   cache={
     done: []
   };
@@ -144,7 +144,7 @@ class Timer {
   };
 }
 
-const n = /*#__PURE__*/ new Timer, s = n.setTimeout, r = n.setInterval, h = n.setImmediate;
+const n = /*#__PURE__*/ new FakeTimer, s = n.setTimeout, r = n.setInterval, h = n.setImmediate;
 
-export { Timer, n as default, n as init, h as setImmediate, r as setInterval, s as setTimeout };
+export { FakeTimer, QueueTimer, TimeCore, n as default, n as defaultFakeTimer, h as setImmediate, r as setInterval, s as setTimeout };
 //# sourceMappingURL=index.esm.mjs.map
