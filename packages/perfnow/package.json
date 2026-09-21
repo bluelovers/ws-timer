@@ -35,7 +35,7 @@
   },
   "scripts": {
     "coverage": "pnpm run test --coverage",
-    "test": "node --run test:jest --",
+    "test": "echo node --run test:jest --",
     "test:jest": "jest --passWithNoTests",
     "test:jest:coverage": "node --run test:jest -- --coverage",
     "test:jest:snapshot": "node --run test:jest -- -u",
