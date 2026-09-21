@@ -2,21 +2,24 @@
  * Created by user on 2017/11/10/010.
  */
 
-import timerScope, { setTimeout, setImmediate } from '../src/timer';
+import timerScope, { setTimeout, setImmediate } from '../src/index';
 import dayjs from 'dayjs';
 
 setTimeout(function (current, timer, self)
 {
+	// @ts-ignore
 	console.log(this, current.id);
 }, 1500);
 
 let q = setTimeout(function (current, timer, self)
 {
+	// @ts-ignore
 	console.log(this, current.id, self);
 }, 500);
 
 setImmediate(function (current, timer, self)
 {
+	// @ts-ignore
 	console.log(this, current.id, self);
 });
 
