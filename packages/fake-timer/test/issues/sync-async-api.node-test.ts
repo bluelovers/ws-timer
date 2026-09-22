@@ -24,6 +24,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
 	FakeTimer as Timer,
+	EnumTimerType,
 } from '../../src/index';
 
 describe('issue: sync vs async API surface', () =>
@@ -38,17 +39,17 @@ describe('issue: sync vs async API surface', () =>
 		// Not a Promise
 		assert.equal(typeof (item as any).then, 'undefined');
 		// Is a real queue item
-		assert.equal(item.type, 'setTimeout');
+		assert.equal(item.type, EnumTimerType.setTimeout);
 		assert.equal(called, false, 'callback must not run until time advances');
 
 		const interval = t.setInterval(() => {}, 500);
 		assert.equal(typeof (interval as any).then, 'undefined');
-		assert.equal(interval.type, 'setInterval');
+		assert.equal(interval.type, EnumTimerType.setInterval);
 		assert.ok(interval.interval != null);
 
 		const immediate = t.setImmediate(() => {});
 		assert.equal(typeof (immediate as any).then, 'undefined');
-		assert.equal(immediate.type, 'setImmediate');
+		assert.equal(immediate.type, EnumTimerType.setImmediate);
 	});
 
 	it('advance() moves time without running any callback', () =>

@@ -10,7 +10,7 @@ import duration from 'dayjs/plugin/duration';
 
 dayjs.extend(duration);
 
-import { FakeTimer as Timer, defaultFakeTimer as init, setTimeout as fakeSetTimeout, setImmediate as fakeSetImmediate } from '../src/index';
+import { FakeTimer as Timer, defaultFakeTimer as init, setTimeout as fakeSetTimeout, setImmediate as fakeSetImmediate, EnumTimerType } from '../src/index';
 import { QueueTimer } from '../src/queue';
 import { TimeCore } from '../src/time';
 
@@ -274,7 +274,7 @@ describe('Timer', () =>
 		const item = await t.setTimeout(() => {}, 1000);
 
 		assert.ok(item);
-		assert.equal(item['type'], 'setTimeout');
+		assert.equal(item['type'], EnumTimerType.setTimeout);
 		assert.equal(t.timer.length, 1);
 	});
 
@@ -285,7 +285,7 @@ describe('Timer', () =>
 		const item = await t.setInterval(() => {}, 500);
 
 		assert.ok(item);
-		assert.equal(item['type'], 'setInterval');
+		assert.equal(item['type'], EnumTimerType.setInterval);
 		assert.equal(t.timer.length, 1);
 	});
 
@@ -296,7 +296,7 @@ describe('Timer', () =>
 		const item = await t.setTimeout(() => {}, dayjs.duration(2000));
 
 		assert.ok(item);
-		assert.equal(item['type'], 'setTimeout');
+		assert.equal(item['type'], EnumTimerType.setTimeout);
 		assert.equal(t.timer.length, 1);
 		assert.ok(item.timing.isValid());
 	});
@@ -308,7 +308,7 @@ describe('Timer', () =>
 		const item = await t.setInterval(() => {}, dayjs.duration(3000));
 
 		assert.ok(item);
-		assert.equal(item['type'], 'setInterval');
+		assert.equal(item['type'], EnumTimerType.setInterval);
 		assert.equal(t.timer.length, 1);
 		assert.ok(item.timing.isValid());
 	});
@@ -330,7 +330,7 @@ describe('Timer', () =>
 		const item = await t.setImmediate(() => {});
 
 		assert.ok(item);
-		assert.equal(item['type'], 'setImmediate');
+		assert.equal(item['type'], EnumTimerType.setImmediate);
 		assert.equal(t.timer.length, 1);
 	});
 

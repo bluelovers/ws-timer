@@ -19,6 +19,7 @@ import assert from 'node:assert/strict';
 import {
 	FakeTimer as Timer,
 	UnsafeGlobalFakeTimer as UnsafeTimer,
+	EnumGlobalClockState,
 	getUnsafeGlobalFakeTimer,
 } from '../../src/index';
 
@@ -209,25 +210,25 @@ describe('issue: clearAll / reset / requestAnimationFrame / global clock', () =>
 		assert.equal(Date.now, originalDateNow, 'Date.now restored after singleton uninstall');
 	});
 
-	it('globalClockState() reports none / this / global distinctly', () =>
+	it('globalClockState() reports none / self / global distinctly', () =>
 	{
 		const a = new UnsafeTimer();
 		const b = new UnsafeTimer();
 
 		// Before anything is installed: both see 'none'.
-		assert.equal(a.globalClockState(), 'none', 'a not installed yet');
-		assert.equal(b.globalClockState(), 'none', 'b not installed yet');
+		assert.equal(a.globalClockState(), EnumGlobalClockState.none, 'a not installed yet');
+		assert.equal(b.globalClockState(), EnumGlobalClockState.none, 'b not installed yet');
 
 		a.installGlobalClock();
 
-		// a installed it → 'this'; b sees a global registration → 'global'.
-		assert.equal(a.globalClockState(), 'this', 'a reports this');
-		assert.equal(b.globalClockState(), 'global', 'b reports global (installed by another instance)');
+		// a installed it → 'self'; b sees a global registration → 'global'.
+		assert.equal(a.globalClockState(), EnumGlobalClockState.self, 'a reports self');
+		assert.equal(b.globalClockState(), EnumGlobalClockState.global, 'b reports global (installed by another instance)');
 
 		a.uninstallGlobalClock();
 
-		assert.equal(a.globalClockState(), 'none', 'a back to none');
-		assert.equal(b.globalClockState(), 'none', 'b back to none');
+		assert.equal(a.globalClockState(), EnumGlobalClockState.none, 'a back to none');
+		assert.equal(b.globalClockState(), EnumGlobalClockState.none, 'b back to none');
 	});
 
 	it('cross-instance uninstall: a different instance can restore via the global registry', () =>
@@ -245,7 +246,7 @@ describe('issue: clearAll / reset / requestAnimationFrame / global clock', () =>
 		b.uninstallGlobalClock();
 
 		assert.equal(Date.now, originalDateNow, 'real Date.now restored even when B triggers uninstall');
-		assert.equal(a.globalClockState(), 'none', 'clock fully uninstalled');
-		assert.equal(b.globalClockState(), 'none', 'b sees none after delegated uninstall');
+		assert.equal(a.globalClockState(), EnumGlobalClockState.none, 'clock fully uninstalled');
+		assert.equal(b.globalClockState(), EnumGlobalClockState.none, 'b sees none after delegated uninstall');
 	});
 });

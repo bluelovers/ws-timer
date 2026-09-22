@@ -4,11 +4,12 @@
 
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
-import { QueueTimer, ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData } from './queue';
+import { QueueTimer, ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData, EnumTimerType } from './queue';
 import { TimeCore } from './time';
 
 export { QueueTimer };
 export { TimeCore };
+export { EnumTimerType };
 
 dayjs.extend(duration);
 
@@ -142,12 +143,12 @@ export class FakeTimer implements ITimer
 	 * @param params - 傳遞給回呼函式的額外參數 / Extra params passed to the callback
 	 * @returns 新增的佇列項目 / The newly added queue item
 	 */
-	protected _schedule(type: 'setTimeout' | 'setInterval' | 'setImmediate' | 'requestAnimationFrame', callback: ICallback, delay: number | duration.Duration, params: any[]): ITimeQueueItem
+	protected _schedule(type: EnumTimerType, callback: ICallback, delay: number | duration.Duration, params: any[]): ITimeQueueItem
 	{
 		return this.timer.add({
 			callback: callback,
 			timing: toDuration(delay),
-			interval: type === 'setInterval' ? toDuration(delay) : undefined,
+			interval: type === EnumTimerType.setInterval ? toDuration(delay) : undefined,
 			params: params,
 			type: type,
 		});
@@ -167,7 +168,7 @@ export class FakeTimer implements ITimer
 	 */
 	setTimeout = (callback: ICallback, delay: number | duration.Duration, ...params: any[]): ITimeQueueItem =>
 	{
-		return this._schedule('setTimeout', callback, delay, params);
+		return this._schedule(EnumTimerType.setTimeout, callback, delay, params);
 	};
 
 	/**
@@ -185,7 +186,7 @@ export class FakeTimer implements ITimer
 	 */
 	setInterval = (callback: ICallback, delay: number | duration.Duration, ...params: any[]): ITimeQueueItem =>
 	{
-		return this._schedule('setInterval', callback, delay, params);
+		return this._schedule(EnumTimerType.setInterval, callback, delay, params);
 	};
 
 	/**
@@ -201,7 +202,7 @@ export class FakeTimer implements ITimer
 	 */
 	setImmediate = (callback: ICallback, ...params: any[]): ITimeQueueItem =>
 	{
-		return this._schedule('setImmediate', callback, 0, params);
+		return this._schedule(EnumTimerType.setImmediate, callback, 0, params);
 	};
 
 	/**
@@ -222,7 +223,7 @@ export class FakeTimer implements ITimer
 	 */
 	requestAnimationFrame = (callback: ICallback, ...params: any[]): ITimeQueueItem =>
 	{
-		return this._schedule('requestAnimationFrame', callback, this.frameInterval, params);
+		return this._schedule(EnumTimerType.requestAnimationFrame, callback, this.frameInterval, params);
 	};
 
 	/**
@@ -438,7 +439,7 @@ export class FakeTimer implements ITimer
 					 * Periodic timer (setInterval): collect for later rescheduling instead
 					 * of permanent removal.
 					 */
-					if (current.type === 'setInterval' && current.interval != null)
+					if (current.type === EnumTimerType.setInterval && current.interval != null)
 					{
 						reschedule.push(current);
 					}
@@ -592,6 +593,25 @@ export function getUnsafeGlobalFakeTimer()
  * The core FakeTimer thus stays pure and never pollutes global state; reach for this
  * subclass only when you specifically need to drive code that reads the real clock.
  */
+/**
+ * 全域時鐘安裝狀態（鍵值相等，便於直接比較）
+ * Global-clock installation state (keys equal their values, convenient for direct comparison)
+ *
+ * - none   : 未安裝 / not installed
+ * - self   : 由本實例安裝 / installed by this instance
+ * - global : 已由某實例安裝（可能是其它實例）/ installed globally (possibly by another instance)
+ *
+ * 註：因 this 為保留字，無法作為列舉成員識別碼，故以 self 表示「本實例」。
+ * Note: 'this' is a reserved word and cannot be an enum member identifier, so 'self' is used
+ * to mean "this instance".
+ */
+export enum EnumGlobalClockState
+{
+	none = 'none',
+	self = 'self',
+	global = 'global',
+}
+
 export class UnsafeGlobalFakeTimer extends FakeTimer
 {
 	/** 全域時鐘是否由「本實例」安裝 / Whether the global clock was installed by THIS instance */
@@ -635,14 +655,14 @@ export class UnsafeGlobalFakeTimer extends FakeTimer
 	 * - 'this'   : 由本實例安裝 / installed by this instance
 	 * - 'global' : 已由某實例安裝（可能是其它實例）/ installed globally (possibly by another instance)
 	 */
-	globalClockState(): 'none' | 'this' | 'global'
+	globalClockState(): EnumGlobalClockState
 	{
 		if (this._clockInstalled)
 		{
-			return 'this';
+			return EnumGlobalClockState.self;
 		}
 
-		return _globalClockInstalled != null ? 'global' : 'none';
+		return _globalClockInstalled != null ? EnumGlobalClockState.global : EnumGlobalClockState.none;
 	}
 
 	/**

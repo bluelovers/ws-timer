@@ -15,6 +15,23 @@ dayjs.extend(minMax);
 export type vMoment = dayjs.Dayjs | duration.Duration;
 
 /**
+ * 計時器種類（鍵值相等，便於直接比較）
+ * Timer kinds (keys equal values, convenient for direct comparison)
+ *
+ * - setTimeout            : 一次性延遲計時器 / one-shot deferred timer
+ * - setInterval           : 週期性計時器 / repeating timer
+ * - setImmediate          : 立即執行（延遲為 0）/ run immediately (delay 0)
+ * - requestAnimationFrame : 每幀執行 / run each animation frame
+ */
+export enum EnumTimerType
+{
+	setTimeout = 'setTimeout',
+	setInterval = 'setInterval',
+	setImmediate = 'setImmediate',
+	requestAnimationFrame = 'requestAnimationFrame',
+}
+
+/**
  * 佇列中的計時器項目介面
  * Timer queue item interface
  *
@@ -43,6 +60,9 @@ export interface ITimeQueueItem
 
 	/** 傳遞給回呼函式的額外參數 / Additional parameters passed to the callback */
 	params?: any[],
+
+	/** 計時器種類 / Timer kind */
+	type?: EnumTimerType,
 
 	/** 允許額外任意屬性 / Allow any additional properties */
 	[key: string]: any;
