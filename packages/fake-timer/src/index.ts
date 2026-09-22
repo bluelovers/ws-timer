@@ -4,12 +4,13 @@
 
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
-import { QueueTimer, ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData, EnumTimerType } from './queue';
+import { QueueTimer, ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData, EnumTimerType, ITimerHandle, IDurationInput, IRemovedTimer } from './queue';
 import { TimeCore } from './time';
 
 export { QueueTimer };
 export { TimeCore };
 export { EnumTimerType };
+export { ITimerHandle, IDurationInput, IRemovedTimer };
 
 dayjs.extend(duration);
 
@@ -40,16 +41,16 @@ export interface ITimer
 	setImmediate(callback: ICallback, ...params: any[]): ITimeQueueItem;
 
 	/** 模擬原生 clearTimeout / Simulate native clearTimeout */
-	clearTimeout(handle?: number | string | ITimeQueueItem): null | ITimeQueueItem;
+	clearTimeout(handle?: ITimerHandle): IRemovedTimer;
 
 	/** 模擬原生 clearInterval / Simulate native clearInterval */
-	clearInterval(handle?: number | string | ITimeQueueItem): null | ITimeQueueItem;
+	clearInterval(handle?: ITimerHandle): IRemovedTimer;
 
 	/** 模擬原生 clearImmediate / Simulate native clearImmediate */
-	clearImmediate(handle?: number | string | ITimeQueueItem): null | ITimeQueueItem;
+	clearImmediate(handle?: ITimerHandle): IRemovedTimer;
 
 	/** 推進虛擬時間（同步，不執行回呼）/ Advance fake time (synchronous, does not run callbacks) */
-	advance(amount?: number | duration.Duration): this;
+	advance(amount?: IDurationInput): this;
 
 	/** 同步執行所有到期項目（不等待回呼）/ Synchronously run expired items (does not await callbacks) */
 	run(): this;
@@ -58,10 +59,10 @@ export interface ITimer
 	runAsync(): Promise<this>;
 
 	/** 推進虛擬時間並同步執行到期項目 / Advance fake time and synchronously run expired items */
-	start(amount?: number | duration.Duration): this;
+	start(amount?: IDurationInput): this;
 
 	/** 推進虛擬時間並非同步執行到期項目 / Advance fake time and asynchronously run expired items */
-	startAsync(amount?: number | duration.Duration): Promise<this>;
+	startAsync(amount?: IDurationInput): Promise<this>;
 
 	/** 清空所有佇列項目（不影響時鐘）/ Clear all queued items (does not affect the clock) */
 	clearAll(): this;
@@ -73,7 +74,7 @@ export interface ITimer
 	requestAnimationFrame(callback: ICallback, ...params: any[]): ITimeQueueItem;
 
 	/** 模擬 cancelAnimationFrame：取消尚未觸發的 rAF 項目 / Simulate cancelAnimationFrame: cancel a pending rAF item */
-	cancelAnimationFrame(handle?: number | string | ITimeQueueItem): null | ITimeQueueItem;
+	cancelAnimationFrame(handle?: ITimerHandle): IRemovedTimer;
 }
 
 /**
@@ -83,7 +84,7 @@ export interface ITimer
  * 若輸入已是 Duration，則直接回傳；否則以數值建立 Duration（單位為毫秒）
  * If input is already a Duration, return it directly; otherwise create a Duration from the number (in milliseconds)
  */
-export function toDuration(value: number | duration.Duration): duration.Duration
+export function toDuration(value: IDurationInput): duration.Duration
 {
 	return dayjs.isDuration(value) ? value : dayjs.duration(value);
 }
@@ -143,7 +144,7 @@ export class FakeTimer implements ITimer
 	 * @param params - 傳遞給回呼函式的額外參數 / Extra params passed to the callback
 	 * @returns 新增的佇列項目 / The newly added queue item
 	 */
-	protected _schedule(type: EnumTimerType, callback: ICallback, delay: number | duration.Duration, params: any[]): ITimeQueueItem
+	protected _schedule(type: EnumTimerType, callback: ICallback, delay: IDurationInput, params: any[]): ITimeQueueItem
 	{
 		return this.timer.add({
 			callback: callback,
@@ -166,7 +167,7 @@ export class FakeTimer implements ITimer
 	 * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
 	 * @returns 新增的佇列項目 / The newly added queue item
 	 */
-	setTimeout = (callback: ICallback, delay: number | duration.Duration, ...params: any[]): ITimeQueueItem =>
+	setTimeout = (callback: ICallback, delay: IDurationInput, ...params: any[]): ITimeQueueItem =>
 	{
 		return this._schedule(EnumTimerType.setTimeout, callback, delay, params);
 	};
@@ -184,7 +185,7 @@ export class FakeTimer implements ITimer
 	 * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
 	 * @returns 新增的佇列項目 / The newly added queue item
 	 */
-	setInterval = (callback: ICallback, delay: number | duration.Duration, ...params: any[]): ITimeQueueItem =>
+	setInterval = (callback: ICallback, delay: IDurationInput, ...params: any[]): ITimeQueueItem =>
 	{
 		return this._schedule(EnumTimerType.setInterval, callback, delay, params);
 	};
@@ -236,7 +237,7 @@ export class FakeTimer implements ITimer
 	 * @param handle - 要取消的項目，可為佇列項目、唯一名稱或索引 / Item to cancel (queue item, name, or index)
 	 * @returns 被移除的項目，若未找到則回傳 null / The removed item, or null if not found
 	 */
-	cancelAnimationFrame = (handle?: number | string | ITimeQueueItem): null | ITimeQueueItem =>
+	cancelAnimationFrame = (handle?: ITimerHandle): IRemovedTimer =>
 	{
 		return this._clear(handle);
 	};
@@ -251,7 +252,7 @@ export class FakeTimer implements ITimer
 	 * @param handle - 要取消的項目，可為佇列項目、唯一名稱或索引 / Item to cancel (queue item, name, or index)
 	 * @returns 被移除的項目，若未找到或 handle 為空則回傳 null / Removed item, or null if not found/empty
 	 */
-	protected _clear(handle?: number | string | ITimeQueueItem): null | ITimeQueueItem
+	protected _clear(handle?: ITimerHandle): IRemovedTimer
 	{
 		if (handle == null)
 		{
@@ -268,7 +269,7 @@ export class FakeTimer implements ITimer
 	 * @param handle - 要取消的項目，可為佇列項目、唯一名稱或索引 / Item to cancel (queue item, name, or index)
 	 * @returns 被移除的項目，若未找到則回傳 null / The removed item, or null if not found
 	 */
-	clearTimeout = (handle?: number | string | ITimeQueueItem): null | ITimeQueueItem =>
+	clearTimeout = (handle?: ITimerHandle): IRemovedTimer =>
 	{
 		return this._clear(handle);
 	};
@@ -283,7 +284,7 @@ export class FakeTimer implements ITimer
 	 * @param handle - 要取消的項目，可為佇列項目、唯一名稱或索引 / Item to cancel (queue item, name, or index)
 	 * @returns 被移除的項目，若未找到則回傳 null / The removed item, or null if not found
 	 */
-	clearInterval = (handle?: number | string | ITimeQueueItem): null | ITimeQueueItem =>
+	clearInterval = (handle?: ITimerHandle): IRemovedTimer =>
 	{
 		return this._clear(handle);
 	};
@@ -295,7 +296,7 @@ export class FakeTimer implements ITimer
 	 * @param handle - 要取消的項目，可為佇列項目、唯一名稱或索引 / Item to cancel (queue item, name, or index)
 	 * @returns 被移除的項目，若未找到則回傳 null / The removed item, or null if not found
 	 */
-	clearImmediate = (handle?: number | string | ITimeQueueItem): null | ITimeQueueItem =>
+	clearImmediate = (handle?: ITimerHandle): IRemovedTimer =>
 	{
 		return this._clear(handle);
 	};
@@ -350,7 +351,7 @@ export class FakeTimer implements ITimer
 	 * @param amount - 推進的時間量，可為毫秒數或 Duration 物件 / Amount of time to advance
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
-	advance = (amount?: number | duration.Duration): this =>
+	advance = (amount?: IDurationInput): this =>
 	{
 		if ((amount as number) < 0)
 		{
@@ -525,7 +526,7 @@ export class FakeTimer implements ITimer
 	 * @param amount - 推進的時間量，可為毫秒數或 Duration 物件 / Amount of time to advance
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
-	start = (amount?: number | duration.Duration): this =>
+	start = (amount?: IDurationInput): this =>
 	{
 		this.advance(amount);
 
@@ -544,7 +545,7 @@ export class FakeTimer implements ITimer
 	 * @param amount - 推進的時間量，可為毫秒數或 Duration 物件 / Amount of time to advance
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
-	startAsync = async (amount?: number | duration.Duration): Promise<this> =>
+	startAsync = async (amount?: IDurationInput): Promise<this> =>
 	{
 		this.advance(amount);
 

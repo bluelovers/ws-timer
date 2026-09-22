@@ -12,7 +12,7 @@ dayjs.extend(duration);
 dayjs.extend(minMax);
 
 /** 虛擬時間或時間區間的聯合型別 / Union type for fake time or time duration */
-export type vMoment = dayjs.Dayjs | duration.Duration;
+export type IDayMoment = dayjs.Dayjs | duration.Duration;
 
 /**
  * 計時器種類（鍵值相等，便於直接比較）
@@ -30,6 +30,35 @@ export enum EnumTimerType
 	setImmediate = 'setImmediate',
 	requestAnimationFrame = 'requestAnimationFrame',
 }
+
+/**
+ * 計時器控制代號（單一真理來源）
+ * Timer handle (single source of truth)
+ *
+ * 呼叫 clear* / remove 時，可用自增 id（number）、隨機名稱（string），
+ * 或直接傳入佇列項目本身（ITimeQueueItem）來指認要操作的計時器。
+ * When calling clear* / remove, identify the target timer by its auto-increment id
+ * (number), random name (string), or the queue item itself (ITimeQueueItem).
+ */
+export type ITimerHandle = number | string | ITimeQueueItem;
+
+/**
+ * 延遲 / 時間間隔的輸入型別（單一真理來源）
+ * Delay / interval input type (single source of truth)
+ *
+ * 可為數值毫秒（number）或 Duration。
+ * Can be milliseconds (number) or a Duration.
+ */
+export type IDurationInput = number | duration.Duration;
+
+/**
+ * 移除計時器的結果（單一真理來源）
+ * Result of removing a timer (single source of truth)
+ *
+ * 成功移除則回傳該項目，否則回傳 null。
+ * Returns the removed item on success, otherwise null.
+ */
+export type IRemovedTimer = null | ITimeQueueItem;
 
 /**
  * 佇列中的計時器項目介面
@@ -75,7 +104,7 @@ export interface ITimeQueueItem
 export interface ITimeQueueItemAdd extends ITimeQueueItem
 {
 	/** 可為 Dayjs 或 Duration（Duration 會在加入時轉換為絕對時間）/ Can be Dayjs or Duration (Duration is converted to absolute time when added) */
-	timing?: dayjs.Dayjs | duration.Duration | any;
+	timing?: IDayMoment | number | any;
 }
 
 /**
@@ -305,7 +334,7 @@ export class QueueTimer extends TimeCore
 	 * - Queue item object (uses its name property for matching)
 	 * - Name string (nanoid-generated unique code)
 	 */
-	remove = (id: number | string | ITimeQueueItem): null | ITimeQueueItem =>
+	remove = (id: ITimerHandle): IRemovedTimer =>
 	{
 		//console.log(typeof id, id);
 
