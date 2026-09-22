@@ -2,7 +2,7 @@
  * Created by user on 2017/11/10/010.
  */
 
-import timerScope, { setTimeout, setImmediate } from '../src/index';
+import defaultFakeTimer, { setTimeout, setImmediate } from '../src/index';
 import dayjs from 'dayjs';
 
 setTimeout(function (current, timer, self)
@@ -23,7 +23,7 @@ setImmediate(function (current, timer, self)
 	console.log(this, current.id, self);
 });
 
-timerScope.start(-1)
+defaultFakeTimer.startAsync(-1)
 	.then(function (self)
 	{
 		console.log(self.timer.data);
@@ -31,7 +31,7 @@ timerScope.start(-1)
 		console.log(self.cache.done);
 		console.log(self.timer.hasExpires());
 
-		return self.start(-1);
+		return self.startAsync(-1);
 	})
 	.then((self) =>
 	{
