@@ -187,7 +187,16 @@ export class FakeTimer implements ITimer
 		/** 清空已完成快取 / Clear the done cache */
 		this.cache.done = [];
 
-		for (let idx in this.timer.queue)
+		/**
+		 * 使用手動索引遍歷，避免 for...in 搭配 splice 時因陣列位移而跳過項目。
+		 * Use a manual index loop to avoid for...in + splice skipping items
+		 * when the array shifts after each removal.
+		 *
+		 * 移除項目後不遞增 idx，因後續項目已前移至同一位置，需重新檢查。
+		 * After removal we do NOT increment idx, because later items have
+		 * shifted into the same position and must be re-checked.
+		 */
+		for (let idx = 0; idx < this.timer.queue.length; )
 		{
 			let current = this.timer.queue[idx];
 
