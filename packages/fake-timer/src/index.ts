@@ -156,10 +156,16 @@ export class FakeTimer implements ITimer
 		/**
 		 * 若 amount 為負數，改用佇列中最早的時間作為推進量
 		 * If amount is negative, use the earliest time in queue as the advance amount
+		 *
+		 * 佇列為空時 cache.min 為 null，此時無最早時間可跳轉，
+		 * 改用 0（不推進）以避免 update(null) 把 fake_now 寫成無效日期。
+		 * When the queue is empty, cache.min is null and there is no earliest
+		 * time to jump to; fall back to 0 (no advance) so update(null) cannot
+		 * corrupt fake_now into an invalid date.
 		 */
 		if ((amount as number) < 0)
 		{
-			amount = this.timer.cache.min;
+			amount = this.timer.cache.min ?? 0;
 		}
 
 		/** 推進虛擬時間 / Advance fake time */
