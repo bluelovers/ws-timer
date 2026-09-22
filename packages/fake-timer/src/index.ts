@@ -59,6 +59,9 @@ export interface ITimer
 	/** 非同步執行所有到期項目（等待每個回呼）/ Asynchronously run expired items (awaits each callback) */
 	runAsync(): Promise<this>;
 
+	/** 以生成器逐個執行到期項目並回傳生成器（不回傳 this）/ Run expired items one-by-one as a generator (does NOT return this) */
+	runGenerator(): Generator<ITimeQueueItem, void, void>;
+
 	/** 推進虛擬時間並同步執行到期項目 / Advance fake time and synchronously run expired items */
 	start(amount?: IDurationInput): this;
 
@@ -519,6 +522,27 @@ export class FakeTimer implements ITimer
 
 		return this;
 	};
+
+	/**
+	 * 以生成器逐個執行到期項目（同步呼叫回呼）
+	 * Run expired items one-by-one as a generator (invokes callbacks synchronously)
+	 *
+	 * 與 run() 同樣會執行每個回呼，但改以生成器形式逐個 yield 已執行的佇列項目，
+	 * 而非回傳 this，方便呼叫者在項目之間插入觀察或處理邏輯。
+	 * Same as run() in that it invokes each callback, but yields each executed queue item
+	 * via a generator instead of returning this — handy for observing/handling between items.
+	 *
+	 * @returns 執行項目的生成器（不回傳 this）/ generator of executed items (does NOT return this)
+	 */
+	*runGenerator(): Generator<ITimeQueueItem, void, void>
+	{
+		for (const current of this._runCore())
+		{
+			current.callback(current, this.timer);
+
+			yield current;
+		}
+	}
 
 	/**
 	 * 推進虛擬時間並同步執行到期的計時器

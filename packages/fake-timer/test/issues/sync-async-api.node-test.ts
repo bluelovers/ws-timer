@@ -187,4 +187,29 @@ describe('issue: sync vs async API surface', () =>
 		assert.equal(syncDrift.length, 3);
 		assert.equal(asyncDrift.length, 3);
 	});
+
+	it('runGenerator() returns a generator (not this) and yields each executed item', () =>
+	{
+		const t = new Timer();
+		const order: string[] = [];
+
+		t.setTimeout(() => order.push('a'), 1000);
+		t.setTimeout(() => order.push('b'), 2000);
+		t.advance(2000);
+
+		const gen = t.runGenerator();
+
+		// Not the instance, not a Promise — it is an iterable generator.
+		assert.notEqual(gen, t, 'runGenerator() must NOT return this');
+		assert.equal(typeof (gen as any).then, 'undefined', 'runGenerator() is not a Promise');
+		assert.equal(typeof gen[Symbol.iterator], 'function', 'runGenerator() is iterable');
+
+		const items = [...gen];
+
+		assert.deepEqual(order, ['a', 'b'], 'callbacks fire synchronously while iterating');
+		assert.equal(items.length, 2, 'generator yields both executed items');
+		assert.equal(items[0].type, EnumTimerType.setTimeout);
+		assert.equal(t.timer.length, 0, 'queue drained after full iteration');
+		assert.equal(t.cache.done.length, 2, 'two items recorded as done');
+	});
 });
