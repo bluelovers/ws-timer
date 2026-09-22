@@ -37,6 +37,15 @@ export interface ITimer
 
 	/** 模擬原生 setImmediate / Simulate native setImmediate */
 	setImmediate(callback: ICallback, ...params: any[]): Promise<ITimeQueueItem>;
+
+	/** 模擬原生 clearTimeout / Simulate native clearTimeout */
+	clearTimeout(handle?: number | string | ITimeQueueItem): null | ITimeQueueItem;
+
+	/** 模擬原生 clearInterval / Simulate native clearInterval */
+	clearInterval(handle?: number | string | ITimeQueueItem): null | ITimeQueueItem;
+
+	/** 模擬原生 clearImmediate / Simulate native clearImmediate */
+	clearImmediate(handle?: number | string | ITimeQueueItem): null | ITimeQueueItem;
 }
 
 /**
@@ -117,6 +126,7 @@ export class FakeTimer implements ITimer
 		let q = this.timer.add({
 			callback: callback,
 			timing: toDuration(delay),
+			interval: toDuration(delay),
 			params: params,
 			type: 'setInterval',
 		});
@@ -142,6 +152,63 @@ export class FakeTimer implements ITimer
 		});
 
 		return q;
+	};
+
+	/**
+	 * 模擬 clearTimeout：取消尚未執行的 setTimeout 項目
+	 * Simulate clearTimeout: cancel a pending setTimeout item
+	 *
+	 * @param handle - 要取消的項目，可為佇列項目、唯一名稱或索引
+	 *                Item to cancel; can be the queue item, its unique name, or its index
+	 * @returns 被移除的項目，若未找到則回傳 null / The removed item, or null if not found
+	 */
+	clearTimeout = (handle?: number | string | ITimeQueueItem): null | ITimeQueueItem =>
+	{
+		if (handle == null)
+		{
+			return null;
+		}
+
+		return this.timer.remove(handle);
+	};
+
+	/**
+	 * 模擬 clearInterval：停止 setInterval 的週期重複
+	 * Simulate clearInterval: stop a setInterval from repeating
+	 *
+	 * 與原生 API 相同，clearTimeout / clearInterval 本質上都只是從佇列移除指定項目。
+	 * Like the native API, clearTimeout / clearInterval are both just queue removals.
+	 *
+	 * @param handle - 要取消的項目，可為佇列項目、唯一名稱或索引
+	 *                Item to cancel; can be the queue item, its unique name, or its index
+	 * @returns 被移除的項目，若未找到則回傳 null / The removed item, or null if not found
+	 */
+	clearInterval = (handle?: number | string | ITimeQueueItem): null | ITimeQueueItem =>
+	{
+		if (handle == null)
+		{
+			return null;
+		}
+
+		return this.timer.remove(handle);
+	};
+
+	/**
+	 * 模擬 clearImmediate：取消尚未執行的 setImmediate 項目
+	 * Simulate clearImmediate: cancel a pending setImmediate item
+	 *
+	 * @param handle - 要取消的項目，可為佇列項目、唯一名稱或索引
+	 *                Item to cancel; can be the queue item, its unique name, or its index
+	 * @returns 被移除的項目，若未找到則回傳 null / The removed item, or null if not found
+	 */
+	clearImmediate = (handle?: number | string | ITimeQueueItem): null | ITimeQueueItem =>
+	{
+		if (handle == null)
+		{
+			return null;
+		}
+
+		return this.timer.remove(handle);
 	};
 
 	/**
@@ -205,6 +272,12 @@ export class FakeTimer implements ITimer
 		this.cache.done = [];
 
 		/**
+		 * 需重新排程的週期性（setInterval）項目
+		 * Periodic (setInterval) items that need to be rescheduled
+		 */
+		const reschedule: ITimeQueueItem[] = [];
+
+		/**
 		 * 使用手動索引遍歷，避免 for...in 搭配 splice 時因陣列位移而跳過項目。
 		 * Use a manual index loop to avoid for...in + splice skipping items
 		 * when the array shifts after each removal.
@@ -229,14 +302,34 @@ export class FakeTimer implements ITimer
 				/** 執行回呼函式 / Execute callback */
 				await current.callback(current, this.timer);
 
-				/** 從佇列中移除 / Remove from queue */
-				this.timer.remove(idx);
-
 				/** 記錄結束時間 / Record end time */
 				current.ending = dayjs();
 
 				/** 加入已完成快取 / Add to done cache */
 				this.cache.done.push(current);
+
+				/**
+				 * 若回呼內已自行移除該項目（例如 clearInterval），則不再重複移除與重排程；
+				 * 此時佇列已位移，停留在同一 idx 繼續檢查下一個項目。
+				 * If the callback already removed this item (e.g. clearInterval), do not
+				 * remove it again or reschedule it; the queue has shifted, so stay at the
+				 * same idx to re-check the next item.
+				 */
+				if (this.timer.queue.includes(current))
+				{
+					/** 從佇列中移除 / Remove from queue */
+					this.timer.remove(idx);
+
+					/**
+					 * 週期性計時器（setInterval）：收集起來稍後重新排程，而非永久移除。
+					 * Periodic timer (setInterval): collect for later rescheduling instead
+					 * of permanent removal.
+					 */
+					if (current.type === 'setInterval' && current.interval != null)
+					{
+						reschedule.push(current);
+					}
+				}
 			}
 			else
 			{
@@ -245,8 +338,32 @@ export class FakeTimer implements ITimer
 			}
 		}
 
-		/** 重新整理佇列快取（因已移除部分項目）/ Refresh queue cache (items were removed) */
-		this.timer._cache_refresh();
+		/**
+		 * 重新排程 setInterval 項目：保留原 name/id（使 clearInterval / remove 仍可有效移除），
+		 * 將 timing 推進一個間隔後放回佇列。
+		 * Reschedule setInterval items: keep the original name/id (so clearInterval / remove still
+		 * works), advance timing by one interval and push it back into the queue.
+		 */
+		for (const item of reschedule)
+		{
+			item.timing = (item.timing as dayjs.Dayjs).add(item.interval as duration.Duration);
+			this.timer.queue.push(item);
+		}
+
+		/**
+		 * 若有重新排程，需重新排序以恢復佇列有序性（hasExpires / run 的 break 優化都依賴排序）；
+		 * 否則僅重新整理快取即可。
+		 * If anything was rescheduled, re-sort to restore queue order (hasExpires / run's break
+		 * optimization both rely on sorting); otherwise just refresh the cache.
+		 */
+		if (reschedule.length)
+		{
+			this.timer.sort();
+		}
+		else
+		{
+			this.timer._cache_refresh();
+		}
 
 		return this;
 	};
@@ -269,6 +386,15 @@ export const setInterval = defaultFakeTimer.setInterval;
 /** 便捷匯出：直接使用全域 Timer 的 setImmediate / Convenience export: use global Timer's setImmediate */
 export const setImmediate = defaultFakeTimer.setImmediate;
 
+/** 便捷匯出：直接使用全域 Timer 的 clearTimeout / Convenience export: use global Timer's clearTimeout */
+export const clearTimeout = defaultFakeTimer.clearTimeout;
+
+/** 便捷匯出：直接使用全域 Timer 的 clearInterval / Convenience export: use global Timer's clearInterval */
+export const clearInterval = defaultFakeTimer.clearInterval;
+
+/** 便捷匯出：直接使用全域 Timer 的 clearImmediate / Convenience export: use global Timer's clearImmediate */
+export const clearImmediate = defaultFakeTimer.clearImmediate;
+
 // @ts-ignore
 if (process.env.TSDX_FORMAT !== 'esm')
 {
@@ -285,4 +411,8 @@ if (process.env.TSDX_FORMAT !== 'esm')
 	Object.defineProperty(defaultFakeTimer, "setTimeout", { value: setTimeout });
 	Object.defineProperty(defaultFakeTimer, "setInterval", { value: setInterval });
 	Object.defineProperty(defaultFakeTimer, "setImmediate", { value: setImmediate });
+
+	Object.defineProperty(defaultFakeTimer, "clearTimeout", { value: clearTimeout });
+	Object.defineProperty(defaultFakeTimer, "clearInterval", { value: clearInterval });
+	Object.defineProperty(defaultFakeTimer, "clearImmediate", { value: clearImmediate });
 }
