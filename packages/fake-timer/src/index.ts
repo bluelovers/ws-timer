@@ -434,6 +434,30 @@ export class FakeTimer implements ITimer
 			pending.splice(lo, 0, item);
 		};
 
+		/**
+		 * 將「即時佇列中已到期、但尚未進入 pending」的項目併入 pending。
+		 * Merge into pending any live-queue items that are already expired but not yet
+		 * in pending.
+		 *
+		 * 回呼內透過 setTimeout / setInterval / setImmediate 追加、且其觸發時間已 <= 現在
+		 * 的計時器，會被併入同一輪 run 中執行——這才符合真實 API 行為
+		 * （原生計時器在時間到達後會被一併排定執行，而非被丟棄）。
+		 * Timers appended during a callback (via setTimeout / setInterval / setImmediate)
+		 * whose fire time is already <= now are merged into the SAME run, matching the
+		 * real API: once the clock reaches a time, every due timer fires (sinon/jest
+		 * exhaustive-run semantics).
+		 */
+		const syncPending = (): void =>
+		{
+			for (const q of this.timer.queue)
+			{
+				if (now.diff(q.timing) >= 0 && !pending.includes(q))
+				{
+					insert(q);
+				}
+			}
+		};
+
 		while (pending.length > 0)
 		{
 			const current = pending[0];
@@ -442,6 +466,23 @@ export class FakeTimer implements ITimer
 			if (now.diff(current.timing) < 0)
 			{
 				break;
+			}
+
+			/**
+			 * 若該項目已在更早的回呼中被清除（clearTimeout / clearInterval / clearImmediate /
+			 * clearAll / reset），則不應執行——符合真實 API：被取消的計時器永不觸發。
+			 * 必須在 yield 前檢查，否則會發生「已清除的計時器仍被執行」的快照錯誤。
+			 * If the item was already cleared during an earlier callback
+			 * (clearTimeout / clearInterval / clearImmediate / clearAll / reset), it must
+			 * NOT fire — matching the real API where a cancelled timer never runs. This
+			 * check must happen BEFORE yield, otherwise we would re-execute an already
+			 * cancelled timer (the old snapshot bug).
+			 */
+			if (!this.timer.queue.includes(current))
+			{
+				pending.shift();
+
+				continue;
 			}
 
 			/** 記錄實際執行時間 / Record actual execution time */
@@ -465,8 +506,15 @@ export class FakeTimer implements ITimer
 			pending.shift();
 
 			/**
-			 * 若回呼內已自行移除該項目（例如 clearInterval），則不處理。
-			 * If the callback already removed this item (e.g. clearInterval), skip handling.
+			 * 回呼可能已追加新的計時器：將其中已到期的併入 pending，使本輪 run 能一併執行。
+			 * The callback may have appended new timers: merge any due ones into pending
+			 * so this same run picks them up.
+			 */
+			syncPending();
+
+			/**
+			 * 若回呼內已自行移除該項目（例如 clearInterval / clearTimeout(current)），則不處理。
+			 * If the callback already removed this item (e.g. clearInterval / clearTimeout(current)), skip handling.
 			 */
 			if (!this.timer.queue.includes(current))
 			{
