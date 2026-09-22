@@ -5,7 +5,6 @@
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import { QueueTimer, ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData } from './queue';
-import { toDuration } from './time';
 import { TimeCore } from './time';
 
 export { QueueTimer };
@@ -38,6 +37,18 @@ export interface ITimer
 
 	/** 模擬原生 setImmediate / Simulate native setImmediate */
 	setImmediate(callback: ICallback, ...params: any[]): Promise<ITimeQueueItem>;
+}
+
+/**
+ * 將數值或 Duration 轉換為 Duration 型別
+ * Converts a number or Duration to a Duration type
+ *
+ * 若輸入已是 Duration，則直接回傳；否則以數值建立 Duration（單位為毫秒）
+ * If input is already a Duration, return it directly; otherwise create a Duration from the number (in milliseconds)
+ */
+export function toDuration(value: number | duration.Duration): duration.Duration
+{
+	return dayjs.isDuration(value) ? value : dayjs.duration(value);
 }
 
 /**
@@ -262,6 +273,8 @@ if (process.env.TSDX_FORMAT !== 'esm')
 
 	Object.defineProperty(defaultFakeTimer, "QueueTimer", { value: QueueTimer });
 	Object.defineProperty(defaultFakeTimer, "TimeCore", { value: TimeCore });
+
+	Object.defineProperty(defaultFakeTimer, "toDuration", { value: toDuration });
 
 	Object.defineProperty(defaultFakeTimer, "setTimeout", { value: setTimeout });
 	Object.defineProperty(defaultFakeTimer, "setInterval", { value: setInterval });

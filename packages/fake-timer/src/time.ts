@@ -8,18 +8,6 @@ import duration from 'dayjs/plugin/duration';
 dayjs.extend(duration);
 
 /**
- * 將數值或 Duration 轉換為 Duration 型別
- * Converts a number or Duration to a Duration type
- *
- * 若輸入已是 Duration，則直接回傳；否則以數值建立 Duration（單位為毫秒）
- * If input is already a Duration, return it directly; otherwise create a Duration from the number (in milliseconds)
- */
-export function toDuration(value: number | duration.Duration): duration.Duration
-{
-	return dayjs.isDuration(value) ? value : dayjs.duration(value);
-}
-
-/**
  * 時間資料介面，儲存真實時間與虛擬時間的狀態
  * Time data interface, stores real time and fake time state
  */
