@@ -11,7 +11,7 @@ dayjs.extend(duration);
  * 時間資料介面，儲存真實時間與虛擬時間的狀態
  * Time data interface, stores real time and fake time state
  */
-export interface ITimeData
+export interface ITimeDataCore
 {
 	/** 自增識別碼 / Auto-increment identifier */
 	id?: number;
@@ -41,7 +41,7 @@ export interface ITimeData
 export class TimeCore
 {
 	/** 時間狀態資料 / Time state data */
-	public data = {} as ITimeData;
+	public data = {} as ITimeDataCore;
 
 	/**
 	 * 建立 Time 實例
@@ -49,7 +49,7 @@ export class TimeCore
 	 *
 	 * @param options - 時間配置選項，可為 ITimeData 物件或直接傳入日期值 / Time config options, can be ITimeData object or a date value directly
 	 */
-	constructor(options?: ITimeData)
+	constructor(options?: ITimeDataCore)
 	{
 		let now;
 
@@ -91,7 +91,7 @@ export class TimeCore
 	 * 工廠方法，建立 Time 實例
 	 * Factory method to create a Time instance
 	 */
-	static new(options?: ITimeData)
+	static new(options?: ITimeDataCore)
 	{
 		let t = new this(options);
 

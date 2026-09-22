@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import minMax from 'dayjs/plugin/minMax';
 import { nanoid } from 'nanoid';
-import { TimeCore, ITimeData as ITimeData2 } from './time';
+import { TimeCore, type ITimeDataCore } from './time';
 
 dayjs.extend(duration);
 dayjs.extend(minMax);
@@ -23,7 +23,7 @@ export type IDayMoment = dayjs.Dayjs | duration.Duration;
  * - setImmediate          : 立即執行（延遲為 0）/ run immediately (delay 0)
  * - requestAnimationFrame : 每幀執行 / run each animation frame
  */
-export enum EnumTimerType
+export const enum EnumTimerType
 {
 	setTimeout = 'setTimeout',
 	setInterval = 'setInterval',
@@ -111,7 +111,7 @@ export interface ITimeQueueItemAdd extends ITimeQueueItem
  * 時間資料擴展介面，加入排序回呼
  * Extended time data interface, adding sort callback
  */
-export interface ITimeData extends ITimeData2
+export interface ITimeData extends ITimeDataCore
 {
 	/** 自訂排序函式 / Custom sort function */
 	sort?: ISortCallback;

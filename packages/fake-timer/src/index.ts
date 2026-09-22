@@ -4,7 +4,8 @@
 
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
-import { QueueTimer, ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData, EnumTimerType, ITimerHandle, IDurationInput, IRemovedTimer } from './queue';
+import { QueueTimer, EnumTimerType } from './queue';
+import type { ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData, ITimerHandle, IDurationInput, IRemovedTimer } from './queue';
 import { TimeCore } from './time';
 
 export { QueueTimer };
@@ -606,7 +607,7 @@ export function getUnsafeGlobalFakeTimer()
  * Note: 'this' is a reserved word and cannot be an enum member identifier, so 'self' is used
  * to mean "this instance".
  */
-export enum EnumGlobalClockState
+export const enum EnumGlobalClockState
 {
 	none = 'none',
 	self = 'self',
