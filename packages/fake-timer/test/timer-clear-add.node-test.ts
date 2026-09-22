@@ -433,3 +433,252 @@ describe('clear API null-safety and return values', () =>
 		assert.equal(t.timer.length, 0);
 	});
 });
+
+describe('run / runAsync / runGenerator concurrency & run-time invariants', () =>
+{
+	/**
+	 * 併發防護：run 進行中再次呼叫 run / runAsync / runGenerator 應為 no-op，
+	 * 不得雙重處理同一個計時器。
+	 * Re-entrancy guard: a run already in progress must make nested run / runAsync /
+	 * runGenerator calls no-ops, never double-processing a timer.
+	 */
+	it('nested run() inside a callback is a no-op (no double processing)', () =>
+	{
+		const t = new Timer();
+		let a = 0;
+		let b = 0;
+
+		t.setTimeout(() =>
+		{
+			a++;
+			t.run(); // 重入呼叫，應為 no-op / re-entrant call, must be a no-op
+		}, 1000);
+
+		t.setTimeout(() =>
+		{
+			b++;
+		}, 1000);
+
+		t.start(1000);
+
+		assert.equal(a, 1);
+		assert.equal(b, 1); // 若無防護會變成 2 / would be 2 without the guard
+	});
+
+	it('runGenerator: nested run() during iteration is a no-op', () =>
+	{
+		const t = new Timer();
+		let a = 0;
+		let b = 0;
+
+		t.setTimeout(() => { a++; }, 1000);
+		t.setTimeout(() => { b++; }, 1000);
+
+		// 先推進虛擬時間，再透過 runGenerator 執行（runGenerator 不會推進時間，但會自動觸發回呼）
+		// advance the virtual clock first, then drive execution via runGenerator
+		// (runGenerator never advances time, but DOES auto-invoke callbacks)
+		t.advance(1000);
+
+		for (const _ of t.runGenerator())
+		{
+			t.run(); // 重入呼叫，應為 no-op / re-entrant call, must be a no-op
+		}
+
+		assert.equal(a, 1);
+		assert.equal(b, 1);
+	});
+
+	it('runGenerator() returns the SAME cached generator on repeated calls', () =>
+	{
+		const t = new Timer();
+
+		t.setTimeout(() => {}, 1000);
+
+		const g1 = t.runGenerator();
+		const g2 = t.runGenerator();
+
+		// 多次呼叫只會得到同一份 _runGenerator() 狀態（不會重複產生導致雙重處理）
+		// repeated calls yield the same _runGenerator() state (no duplicate generation / double-processing)
+		assert.strictEqual(g1, g2);
+	});
+
+	it('runAsync: nested run() / advance() inside async callback are guarded', async () =>
+	{
+		const t = new Timer();
+		let count = 0;
+		let advanceThrew = false;
+
+		t.setTimeout(async () =>
+		{
+			count++;
+			t.run(); // 重入 no-op / re-entrant no-op
+
+			try
+			{
+				t.advance(1000); // 執行期間禁止時間跳躍 / time jump forbidden during run
+			}
+			catch
+			{
+				advanceThrew = true;
+			}
+		}, 1000);
+
+		await t.startAsync(1000);
+
+		assert.equal(count, 1);
+		assert.equal(advanceThrew, true);
+	});
+
+	/**
+	 * 時間跳躍防護：run 執行期間禁止 advance() 推進虛擬時間。
+	 * Time-jump guard: advance() is forbidden while a run is in progress.
+	 */
+	it('advance() inside a callback throws (time jump forbidden during run)', () =>
+	{
+		const t = new Timer();
+		let threw = false;
+
+		t.setTimeout(() =>
+		{
+			try
+			{
+				t.advance(1000);
+			}
+			catch
+			{
+				threw = true;
+			}
+		}, 1000);
+
+		t.start(1000);
+
+		assert.equal(threw, true);
+		// 活躍 run 狀態應已被釋放，後續 run 正常 / active run must be released so later runs work
+		assert.equal((t as any)._activeRun, null);
+	});
+
+	it('active run state is released after a normal run (sequential runs work)', () =>
+	{
+		const t = new Timer();
+		let count = 0;
+
+		t.setTimeout(() => { count++; }, 1000);
+		t.start(1000);
+		assert.equal(count, 1);
+		assert.equal((t as any)._activeRun, null);
+
+		// 第二輪 run 應正常執行，不受前次影響 / a second run must work normally
+		t.setTimeout(() => { count++; }, 1000);
+		t.start(1000);
+		assert.equal(count, 2);
+	});
+
+	/**
+	 * 回呼內追加「已到期」計時器，經由內部 tryAdd 直接併入本輪 run，
+	 * 不需要反覆掃描佇列（pending 內部 API）。
+	 * A due timer appended inside a callback is merged into the SAME run via the internal
+	 * tryAdd (the pending internal API), without repeatedly scanning the queue.
+	 */
+	it('appended due timer is merged into the current run via internal pending API', () =>
+	{
+		const t = new Timer();
+		let first = 0;
+		let imm = 0;
+
+		t.setTimeout(() =>
+		{
+			first++;
+
+			t.setImmediate(() =>
+			{
+				imm++;
+			});
+		}, 1000);
+
+		t.start(1000);
+
+		assert.equal(first, 1);
+		assert.equal(imm, 1); // 經由 tryAdd 併入同一輪 / merged into the same run via tryAdd
+	});
+
+	/**
+	 * 中斷（cancel / pause）：執行期間禁止時間跳躍已在前述測試驗證，此處驗證中斷後的時間修正。
+	 * Interruption (cancel / pause): time-jump-during-run is already verified above; here we
+	 * verify the time correction after interruption.
+	 */
+	it('cancel() during a callback aborts remaining timers and reverts the virtual time', () =>
+	{
+		const t = new Timer();
+		const start0 = t.timer.now().valueOf();
+		let count = 0;
+
+		t.setTimeout(() =>
+		{
+			count++;
+			t.cancel(); // 中止本輪 run / abort this run
+		}, 1000);
+
+		t.setTimeout(() =>
+		{
+			count++;
+		}, 2000);
+
+		// 推進到 3000 並執行；第一個回呼內 cancel 會撤銷時間跳躍
+		// advance to 3000 and run; cancel inside the 1st callback undoes the time jump
+		t.start(3000);
+
+		// 只有第一個計時器執行（第二個被取消）
+		// only the first timer runs (the second is cancelled)
+		assert.equal(count, 1);
+
+		// 虛擬時間回到本次 run 開始前的值（start 推進前）
+		// virtual time is back to the value before this run (before start's advance)
+		assert.equal(t.timer.now().valueOf(), start0);
+	});
+
+	it('pause() during a callback stops and corrects time to the next pending item', () =>
+	{
+		const t = new Timer();
+		const start0 = t.timer.now().valueOf();
+		let count = 0;
+
+		t.setTimeout(() =>
+		{
+			count++;
+			t.pause(); // 在第一個回呼內暫停 / pause inside the 1st callback
+		}, 1000);
+
+		t.setTimeout(() =>
+		{
+			count++;
+		}, 2000);
+
+		t.start(3000);
+
+		// 第一個執行後暫停，第二個未執行
+		// 1st fires then pauses; 2nd does not
+		assert.equal(count, 1);
+
+		// 時間修正為下一個待執行項目（原排程 2000）的觸發時間
+		// time is corrected to the next pending item's scheduled time (2000)
+		assert.equal(t.timer.now().valueOf(), start0 + 2000);
+
+		// 續跑：時間已修正到 2000，再 run 即觸發第二個
+		// resume: time is already at 2000, run() fires the 2nd immediately
+		t.start(0);
+		assert.equal(count, 2);
+	});
+
+	it('cancel() while idle is a safe no-op', () =>
+	{
+		const t = new Timer();
+		const start0 = t.timer.now().valueOf();
+
+		t.setTimeout(() => {}, 1000);
+		t.cancel();
+		t.pause();
+
+		assert.equal(t.timer.now().valueOf(), start0);
+		assert.equal(t.timer.length, 1);
+	});
+});
