@@ -45,13 +45,14 @@
     "test": "test"
   },
   "scripts": {
-    "pretest": "tsc --noEmit & echo Typescript checked",
+    "pretest": "node --run test:tsc",
     "test": "node --run test:node",
     "test:jest": "jest --passWithNoTests",
     "test:jest:coverage": "node --run test:jest -- --coverage",
     "test:jest:snapshot": "node --run test:jest -- -u",
     "test:node": "tsx --test test/*.node-test.ts",
     "test:snapshot": "pnpm run test -u",
+    "test:tsc": "tsc --noEmit & echo Typescript checked",
     "test:tsd": "ynpx tsd",
     "prebuild": "pnpm run test",
     "build": "node --run build:tsdx && node --run build:dts:bundle",
