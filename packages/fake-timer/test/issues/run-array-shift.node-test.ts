@@ -268,3 +268,85 @@ describe('issue: run() must not skip items after removing during iteration', () 
 		assert.equal(t.timer.length, 1, 'interval A rescheduled');
 	});
 });
+
+describe('issue: mixed one-shot + periodic timers, single large fast-forward', () =>
+{
+	it('the 9-timer scenario interleaves strictly by timing (with id tie-break), replaying every interval tick', () =>
+	{
+		const t = new Timer();
+
+		/**
+		 * 記錄每一筆執行的 (標籤, 絕對觸發時間)。
+		 * Record each execution as (label, absolute timing).
+		 *
+		 * 回呼會收到 `current`（佇列項目本身）作為第一個參數，故可從
+		 * `current.timing` 取得該次「本應觸發的絕對時間」，而不會被統一的
+		 * 虛擬 now 混淆（run 期間 now 固定不動）。
+		 * The callback receives `current` (the queue item) as its first arg, so we
+		 * read `current.timing` for the absolute scheduled time — not the fixed
+		 * virtual `now`, which stays constant during the run.
+		 */
+		const order: Array<{ label: string; at: number }> = [];
+
+		/**
+		 * 記錄快轉前的基底時間，用來把「絕對觸發時間」還原成「相對於起點的延遲 ms」。
+		 * Record the base time before fast-forwarding, so we can turn the absolute
+		 * `timing` back into a delay (ms relative to the start).
+		 */
+		const base = t.timer.now().valueOf();
+
+		const T = (label: string, delay: number) =>
+			t.setTimeout((item: any) => order.push({ label, at: item.timing.valueOf() - base }), delay);
+		const I = (label: string, delay: number) =>
+			t.setInterval((item: any) => order.push({ label, at: item.timing.valueOf() - base }), delay);
+
+		// 插入順序即 id 順序（id 自增），同 timing 時依 id 升冪交錯。
+		// Insertion order == id order; same timing interleaves by id ascending.
+		T('T3000', 3000);
+		I('I3000', 3000);
+		T('T6000', 6000);
+		T('T2000', 2000);
+		I('I2000', 2000);
+		T('T5000', 5000);
+		T('T1000', 1000);
+		I('I1000', 1000);
+		T('T4000', 4000);
+
+		// 一次快轉覆蓋到 6000：所有一次性與週期性 tick（<=6000）都應在本輪 run 內執行。
+		// One fast-forward up to 6000: all one-shots and interval ticks (<=6000) run in this round.
+		t.start(6000);
+
+		// 共 17 筆：6 個一次性 + 週期性 tick（I1000×6, I2000×3, I3000×2）= 11。
+		// Total 17: 6 one-shots + periodic ticks (I1000×6, I2000×3, I3000×2) = 11.
+		assert.equal(order.length, 17, 'all one-shots and every in-window interval tick fired');
+
+		// 執行時間（at）必須嚴格不遞減（依 timing 升冪交錯）。
+		// Execution times (at) must be non-decreasing (interleaved by timing ascending).
+		const at = order.map((o) => o.at);
+
+		assert.deepEqual(at, [
+			1000, 1000,            // @1000: T1000, I1000
+			2000, 2000, 2000,      // @2000: T2000, I2000, I1000
+			3000, 3000, 3000,      // @3000: T3000, I3000, I1000
+			4000, 4000, 4000,      // @4000: I2000, I1000, T4000
+			5000, 5000,            // @5000: T5000, I1000
+			6000, 6000, 6000, 6000 // @6000: I3000, T6000, I2000, I1000
+		]);
+
+		// 標籤序列編碼了 tie-break 順序（同 timing 依插入 id 升冪）。
+		// The label sequence encodes the tie-break (same timing ordered by insertion id ascending).
+		assert.deepEqual(order.map((o) => o.label), [
+			'T1000', 'I1000',
+			'T2000', 'I2000', 'I1000',
+			'T3000', 'I3000', 'I1000',
+			'I2000', 'I1000', 'T4000',
+			'T5000', 'I1000',
+			'I3000', 'T6000', 'I2000', 'I1000'
+		]);
+
+		// 三個週期性計時器已被推進到下個視窗外（7000/8000/9000）並留在佇列。
+		// The three intervals were advanced beyond the window (7000/8000/9000) and stay queued.
+		assert.equal(t.timer.length, 3, 'intervals rescheduled beyond the window remain queued');
+		assert.equal(t.cache.done.length, 17);
+	});
+});

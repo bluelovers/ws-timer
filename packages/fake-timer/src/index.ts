@@ -388,122 +388,133 @@ export class FakeTimer implements ITimer
 	 */
 	protected *_runCore(): Generator<ITimeQueueItem, void, void>
 	{
-		let now = this.timer.now();
+		const now = this.timer.now();
 
 		/** 清空已完成快取 / Clear the done cache */
 		this.cache.done = [];
 
 		/**
-		 * 需重新排程的週期性（setInterval）項目
-		 * Periodic (setInterval) items that need to be rescheduled
+		 * 臨時執行陣列：即時佇列的淺拷貝（元素與即時佇列共享同一參考）。
+		 * 本輪 run 完全由它驅動，執行期間「不」對即時佇列重新排序——
+		 * 週期性項目更新 timing 後以二分插入回到此陣列的正確位置，最後才對即時佇列排序一次。
+		 * Temporary execution array: a shallow copy of the live queue (elements share the
+		 * same references as the live queue). This run is driven entirely by it, so we never
+		 * re-sort the live queue mid-run — a periodic item's updated timing is binary-inserted
+		 * back into this array at the right spot, and the live queue is sorted just once at the end.
 		 */
-		const reschedule: ITimeQueueItem[] = [];
+		const pending = [...this.timer.queue];
 
-		for (let idx = 0; idx < this.timer.queue.length; )
+		/**
+		 * 二分插入，保持 pending 依 (timing 升冪, id 升冪) 有序（與 queueSortCallback 一致）。
+		 * Binary insert keeping pending ordered by (timing asc, id asc), matching queueSortCallback.
+		 */
+		const insert = (item: ITimeQueueItem): void =>
 		{
-			let current = this.timer.queue[idx];
+			let lo = 0;
+			let hi = pending.length;
+
+			while (lo < hi)
+			{
+				const mid = (lo + hi) >> 1;
+				const m = pending[mid];
+				const d = m.timing.diff(item.timing);
+
+				// (timing 升冪, id 升冪)：m 應排在 item 之前時向右收斂
+				// (timing asc, id asc): converge right when m should come before item
+				if (d < 0 || (d === 0 && (m.id ?? 0) < (item.id ?? 0)))
+				{
+					lo = mid + 1;
+				}
+				else
+				{
+					hi = mid;
+				}
+			}
+
+			pending.splice(lo, 0, item);
+		};
+
+		while (pending.length > 0)
+		{
+			const current = pending[0];
+
+			/** 佇列已排序，最早者若未到期即可停止 / earliest item unexpired → stop */
+			if (now.diff(current.timing) < 0)
+			{
+				break;
+			}
+
+			/** 記錄實際執行時間 / Record actual execution time */
+			current.active = dayjs();
 
 			/**
-			 * 檢查項目是否已到期（timing <= 當前虛擬時間）
-			 * Check if item has expired (timing <= current fake time)
+			 * 將項目交給驅動器執行回呼（同步或 async）；
+			 * yield 後續的結束時間記錄 / 移除 / 重排程由本生成器在恢復後完成。
+			 * Hand the item to the driver to invoke the callback (sync or async);
+			 * the ending-time / removal / rescheduling after this is done by this generator once it resumes.
 			 */
-			if (now.diff(current.timing) >= 0)
+			yield current;
+
+			/** 記錄結束時間 / Record end time */
+			current.ending = dayjs();
+
+			/** 加入已完成快取 / Add to done cache */
+			this.cache.done.push(current);
+
+			/** 從臨時陣列移除（無論週期或一次性）/ remove from the temp array (periodic or one-shot) */
+			pending.shift();
+
+			/**
+			 * 若回呼內已自行移除該項目（例如 clearInterval），則不處理。
+			 * If the callback already removed this item (e.g. clearInterval), skip handling.
+			 */
+			if (!this.timer.queue.includes(current))
 			{
-				/** 記錄實際執行時間 / Record actual execution time */
-				current.active = dayjs();
+				continue;
+			}
+
+			if (current.type === EnumTimerType.setInterval && current.interval != null)
+			{
+				const oldTiming = current.timing as dayjs.Dayjs;
+				const nextTiming = oldTiming.add(current.interval as duration.Duration);
 
 				/**
-				 * 將項目交給驅動器執行回呼（同步或 async）；
-				 * yield 後續的結束時間記錄 / 移除 / 重排程由本生成器在恢復後完成。
-				 * Hand the item to the driver to invoke the callback (sync or async);
-				 * the ending-time / removal / rescheduling after this is done by this
-				 * generator once it resumes.
+				 * 重新排程後「時間有推進」且仍 <= now：就地推進 timing，並以二分插入
+				 * 回到臨時陣列繼續在本輪 run 內觸發（修正單次觸發問題）。
+				 * Rescheduled timing actually advanced AND still <= now: advance timing in
+				 * place and binary-insert back into the temp array to keep firing within
+				 * the SAME run (fixes the single-fire issue).
 				 */
-				yield current;
-
-				/** 記錄結束時間 / Record end time */
-				current.ending = dayjs();
-
-				/** 加入已完成快取 / Add to done cache */
-				this.cache.done.push(current);
-
-				/**
-				 * 若回呼內已自行移除該項目（例如 clearInterval），則不再重複移除與重排程；
-				 * 此時佇列已位移，停留在同一 idx 繼續檢查下一個項目。
-				 * If the callback already removed this item (e.g. clearInterval), do not
-				 * remove it again or reschedule it; the queue has shifted, so stay at the
-				 * same idx to re-check the next item.
-				 */
-				if (this.timer.queue.includes(current))
+				if (nextTiming.valueOf() > oldTiming.valueOf() && nextTiming.valueOf() <= now.valueOf())
 				{
-					/**
-					 * 週期性計時器（setInterval）：判斷重新排程後是否仍落在本次快轉視窗內。
-					 * Periodic timer (setInterval): decide whether the rescheduled timing
-					 * still falls inside the current fast-forward window.
-					 */
-					if (current.type === EnumTimerType.setInterval && current.interval != null)
-					{
-						const nextTiming = (current.timing as dayjs.Dayjs).add(current.interval as duration.Duration);
+					current.timing = nextTiming;
 
-						/**
-						 * 重新排程後「時間有推進」且仍 <= now：就地推進 timing 並重新排序，
-						 * 停留在同一 idx 繼續處理，使同一輪 run 內重複觸發（修正單次觸發問題）。
-						 * Rescheduled timing actually advanced AND still <= now: advance timing
-						 * in place, re-sort, and stay at the same idx to keep firing within the
-						 * SAME run (fixes the single-fire issue).
-						 */
-						if (nextTiming.valueOf() > current.timing.valueOf() && nextTiming.valueOf() <= now.valueOf())
-						{
-							current.timing = nextTiming;
-							this.timer.sort();
+					insert(current);
 
-							continue;
-						}
-
-						/** 下一跳超出視窗（或 interval<=0 不推進）：留給未來 run / next tick beyond window (or non-advancing interval): defer to a future run */
-						this.timer.remove(idx);
-						reschedule.push(current);
-					}
-					else
-					{
-						/** 一次性計時器：從佇列中移除 / one-shot timer: remove from queue */
-						this.timer.remove(idx);
-					}
+					continue;
 				}
+
+				/**
+				 * 下一跳超出視窗（或 interval<=0 不推進）：timing 已更新為 nextTiming，
+				 * 留在即時佇列中供未來 run 使用；不插回臨時陣列（本輪不再觸發）。
+				 * Next tick beyond window (or non-advancing interval): timing advanced to
+				 * nextTiming, kept in the live queue for a future run; not re-inserted here.
+				 */
+				current.timing = nextTiming;
 			}
 			else
 			{
-				/** 佇列已排序，遇到未到期項目即可停止遍歷 / Queue is sorted, can stop at first unexpired item */
-				break;
+				/** 一次性計時器：從即時佇列移除（保持順序，不重新排序）/ one-shot: remove from live queue (order-preserving, no re-sort) */
+				this.timer.remove(current);
 			}
 		}
 
 		/**
-		 * 重新排程 setInterval 項目：保留原 name/id（使 clearInterval / remove 仍可有效移除），
-		 * 將 timing 推進一個間隔後放回佇列。
-		 * Reschedule setInterval items: keep the original name/id, advance timing by one
-		 * interval and push it back into the queue.
+		 * 本輪執行期間即時佇列的 interval timing 是被就地更新的，故最後排序一次以恢復有序性。
+		 * During this run, interval timings in the live queue were updated in place, so
+		 * sort it once at the end to restore order.
 		 */
-		for (const item of reschedule)
-		{
-			item.timing = (item.timing as dayjs.Dayjs).add(item.interval as duration.Duration);
-			this.timer.queue.push(item);
-		}
-
-		/**
-		 * 若有重新排程，需重新排序以恢復佇列有序性（hasExpires / break 優化都依賴排序）；
-		 * 否則僅重新整理快取即可。
-		 * If anything was rescheduled, re-sort to restore queue order; otherwise just
-		 * refresh the cache.
-		 */
-		if (reschedule.length)
-		{
-			this.timer.sort();
-		}
-		else
-		{
-			this.timer._cache_refresh();
-		}
+		this.timer.sort();
 	}
 
 	/**
