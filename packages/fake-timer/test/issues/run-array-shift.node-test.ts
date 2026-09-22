@@ -177,4 +177,94 @@ describe('issue: run() must not skip items after removing during iteration', () 
 		assert.deepEqual(order, [1000, 2000, 3000, 5000]);
 		assert.equal(t.timer.length, 0);
 	});
+
+	it('mixed setInterval + setTimeout: single large fast-forward replays every interval tick within the window', () =>
+	{
+		const t = new Timer();
+		const order: string[] = [];
+
+		t.setInterval(() => order.push('A'), 1000); // periodic
+		t.setTimeout(() => order.push('C'), 1500);  // normal
+
+		// 一次快轉到 3000：A 的 1000/2000/3000 三跳全部在本輪 run 中執行；
+		// C 依 timing 在 1500 交錯執行。
+		// One jump to 3000: A's ticks at 1000/2000/3000 all fire in THIS run;
+		// C interleaves at 1500 by timing.
+		t.start(3000);
+
+		assert.deepEqual(order, ['A', 'C', 'A', 'A']);
+		// A 已被重新排程到下一跳（4000）並留在佇列中，等待下一次 run
+		// A was rescheduled to its next tick (4000) and stays queued for the next run
+		assert.equal(t.timer.length, 1);
+		assert.equal(t.cache.done.length, 4);
+	});
+
+	it('lone setInterval: a single start() covering N periods fires N times', () =>
+	{
+		const t = new Timer();
+		let count = 0;
+
+		t.setInterval(() => count++, 1000);
+
+		// 快轉 3000ms 涵蓋 1000/2000/3000 三個週期 → 應觸發 3 次
+		// Fast-forward 3000ms covers 3 periods (1000/2000/3000) → should fire 3 times
+		t.start(3000);
+
+		assert.equal(count, 3);
+		assert.equal(t.timer.length, 1, 'interval rescheduled to 4000 for the next run');
+	});
+
+	it('setInterval with interval 0 must not loop forever (fires once per run)', () =>
+	{
+		const t = new Timer();
+		let count = 0;
+
+		// interval 0（不推進時間）若無防護會在單次 run 中無限迴圈
+		// interval 0 (no time advance) would infinite-loop in a single run without the guard
+		t.setInterval(() => count++, 0);
+
+		t.start(1000);
+
+		assert.equal(count, 1, 'interval 0 fires exactly once per run, not infinitely');
+		assert.equal(t.timer.length, 1, 'still queued for the next run');
+	});
+
+	it('mixed setInterval + setTimeout: stepped runs interleave strictly by timing', () =>
+	{
+		const t = new Timer();
+		const order: string[] = [];
+
+		t.setInterval(() => order.push('A'), 1000);
+		t.setTimeout(() => order.push('C'), 1500);
+
+		// 分三步快轉，每次 1000：週期與普通計時器純依 timing 交錯
+		// Step three times, 1000 each: periodic and normal timers interleave purely by timing
+		t.start(1000); // A@1000
+		t.start(1000); // C@1500, A@2000
+		t.start(1000); // A@3000
+
+		// 交錯結果：A(1000) → C(1500) → A(2000) → A(3000)
+		assert.deepEqual(order, ['A', 'C', 'A', 'A']);
+		assert.equal(t.timer.length, 1, 'interval rescheduled to 4000');
+	});
+
+	it('setInterval and setTimeout at the same timing order by id (insertion), not by type', () =>
+	{
+		const t = new Timer();
+		const order: string[] = [];
+
+		t.setInterval(() => order.push('A'), 1000);
+		t.setTimeout(() => order.push('C'), 1000);
+		t.setImmediate(() => order.push('D'));
+
+		t.start(1000);
+
+		// D（timing 0）一定最先；A 與 C 同 timing（1000）以 id（插入順序）決定先後，
+		// 與「是否為週期性」無關——A 先插入故排在 C 前。
+		// D (timing 0) is always first; A and C share timing 1000 and are ordered by id
+		// (insertion order), unrelated to whether they are periodic.
+		assert.equal(order[0], 'D', 'setImmediate (timing 0) runs first');
+		assert.deepEqual(order.slice(1), ['A', 'C'], 'A before C because A was inserted first (id tie-break)');
+		assert.equal(t.timer.length, 1, 'interval A rescheduled');
+	});
 });

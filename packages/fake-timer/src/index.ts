@@ -436,17 +436,38 @@ export class FakeTimer implements ITimer
 				 */
 				if (this.timer.queue.includes(current))
 				{
-					/** 從佇列中移除 / Remove from queue */
-					this.timer.remove(idx);
-
 					/**
-					 * 週期性計時器（setInterval）：收集起來稍後重新排程，而非永久移除。
-					 * Periodic timer (setInterval): collect for later rescheduling instead
-					 * of permanent removal.
+					 * 週期性計時器（setInterval）：判斷重新排程後是否仍落在本次快轉視窗內。
+					 * Periodic timer (setInterval): decide whether the rescheduled timing
+					 * still falls inside the current fast-forward window.
 					 */
 					if (current.type === EnumTimerType.setInterval && current.interval != null)
 					{
+						const nextTiming = (current.timing as dayjs.Dayjs).add(current.interval as duration.Duration);
+
+						/**
+						 * 重新排程後「時間有推進」且仍 <= now：就地推進 timing 並重新排序，
+						 * 停留在同一 idx 繼續處理，使同一輪 run 內重複觸發（修正單次觸發問題）。
+						 * Rescheduled timing actually advanced AND still <= now: advance timing
+						 * in place, re-sort, and stay at the same idx to keep firing within the
+						 * SAME run (fixes the single-fire issue).
+						 */
+						if (nextTiming.valueOf() > current.timing.valueOf() && nextTiming.valueOf() <= now.valueOf())
+						{
+							current.timing = nextTiming;
+							this.timer.sort();
+
+							continue;
+						}
+
+						/** 下一跳超出視窗（或 interval<=0 不推進）：留給未來 run / next tick beyond window (or non-advancing interval): defer to a future run */
+						this.timer.remove(idx);
 						reschedule.push(current);
+					}
+					else
+					{
+						/** 一次性計時器：從佇列中移除 / one-shot timer: remove from queue */
+						this.timer.remove(idx);
 					}
 				}
 			}
