@@ -132,4 +132,49 @@ describe('issue: run() must not skip items after removing during iteration', () 
 		assert.equal(t.timer.length, 0);
 		assert.equal(t.cache.done.length, total);
 	});
+
+	it('out-of-order scheduling (5000,1000,3000,2000) + single large fast-forward runs in ascending timing order', () =>
+	{
+		const t = new Timer();
+		const order: number[] = [];
+
+		// 故意以亂序插入 / inserted deliberately out of order
+		t.setTimeout(() => order.push(5000), 5000);
+		t.setTimeout(() => order.push(1000), 1000);
+		t.setTimeout(() => order.push(3000), 3000);
+		t.setTimeout(() => order.push(2000), 2000);
+
+		// 一次性大量快轉（覆蓋所有項目）/ one-time large fast-forward covering all
+		t.start(5000);
+
+		// 執行順序由絕對觸發時間 timing 決定，與插入順序無關
+		// execution order is decided by absolute timing, NOT insertion order
+		assert.deepEqual(order, [1000, 2000, 3000, 5000]);
+		assert.equal(t.timer.length, 0);
+		assert.equal(t.cache.done.length, 4);
+	});
+
+	it('multiple large fast-forwards (5000,4000,3000) still run in ascending timing order', () =>
+	{
+		const t = new Timer();
+		const order: number[] = [];
+
+		t.setTimeout(() => order.push(5000), 5000);
+		t.setTimeout(() => order.push(1000), 1000);
+		t.setTimeout(() => order.push(3000), 3000);
+		t.setTimeout(() => order.push(2000), 2000);
+
+		// 分次快轉：第一跳即涵蓋全部到期項目，後續快轉無可執行項目
+		// multiple fast-forwards: the first jump already covers all expired items;
+		// later jumps have nothing left to run
+		t.advance(5000);
+		t.run();
+		t.advance(4000);
+		t.run();
+		t.advance(3000);
+		t.run();
+
+		assert.deepEqual(order, [1000, 2000, 3000, 5000]);
+		assert.equal(t.timer.length, 0);
+	});
 });
