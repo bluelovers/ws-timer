@@ -61,6 +61,18 @@ export interface ITimer
 
 	/** 推進虛擬時間並非同步執行到期項目 / Advance fake time and asynchronously run expired items */
 	startAsync(amount?: number | duration.Duration): Promise<this>;
+
+	/** 清空所有佇列項目（不影響時鐘）/ Clear all queued items (does not affect the clock) */
+	clearAll(): this;
+
+	/** 清空佇列並將虛擬時間重置回初始值 / Clear the queue and reset the fake clock to its initial value */
+	reset(): this;
+
+	/** 模擬 requestAnimationFrame：於下一個「影格」觸發回呼 / Simulate requestAnimationFrame: fire on the next frame */
+	requestAnimationFrame(callback: ICallback, ...params: any[]): ITimeQueueItem;
+
+	/** 模擬 cancelAnimationFrame：取消尚未觸發的 rAF 項目 / Simulate cancelAnimationFrame: cancel a pending rAF item */
+	cancelAnimationFrame(handle?: number | string | ITimeQueueItem): null | ITimeQueueItem;
 }
 
 /**
@@ -96,6 +108,15 @@ export class FakeTimer implements ITimer
 	};
 
 	/**
+	 * 每個影格（frame）的間隔，供 requestAnimationFrame 使用
+	 * Per-frame interval used by requestAnimationFrame
+	 *
+	 * 預設為 1000/60 毫秒（約 60fps）。可直接覆寫以模擬不同刷新率。
+	 * Defaults to 1000/60 ms (~60fps). Override directly to simulate other refresh rates.
+	 */
+	public frameInterval: duration.Duration = dayjs.duration(1000 / 60);
+
+	/**
 	 * 建立 Timer 實例
 	 * Create a Timer instance
 	 *
@@ -121,7 +142,7 @@ export class FakeTimer implements ITimer
 	 * @param params - 傳遞給回呼函式的額外參數 / Extra params passed to the callback
 	 * @returns 新增的佇列項目 / The newly added queue item
 	 */
-	protected _schedule(type: 'setTimeout' | 'setInterval' | 'setImmediate', callback: ICallback, delay: number | duration.Duration, params: any[]): ITimeQueueItem
+	protected _schedule(type: 'setTimeout' | 'setInterval' | 'setImmediate' | 'requestAnimationFrame', callback: ICallback, delay: number | duration.Duration, params: any[]): ITimeQueueItem
 	{
 		return this.timer.add({
 			callback: callback,
@@ -184,6 +205,42 @@ export class FakeTimer implements ITimer
 	};
 
 	/**
+	 * 模擬 requestAnimationFrame：於下一個「影格」觸發回呼
+	 * Simulate requestAnimationFrame: fire the callback on the next frame
+	 *
+	 * 排程時間為「目前虛擬時間 + frameInterval」，因此每個影格呼叫一次 advance(frameInterval)
+	 * 再 run() 即可觸發該影格的 rAF 回呼（與遊戲主迴圈完全相同）。
+	 * The scheduled time is `now + frameInterval`, so calling advance(frameInterval) then run()
+	 * each frame triggers that frame's rAF callback (identical to a game main loop).
+	 *
+	 * 同步 API：直接回傳佇列項目，不回傳 Promise。
+	 * Synchronous API: returns the queue item directly (no Promise).
+	 *
+	 * @param callback - 影格觸發時執行的回呼函式 / Callback to execute on the frame
+	 * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
+	 * @returns 新增的佇列項目（可作為 cancelAnimationFrame 的 handle）/ The new queue item (usable as cancelAnimationFrame handle)
+	 */
+	requestAnimationFrame = (callback: ICallback, ...params: any[]): ITimeQueueItem =>
+	{
+		return this._schedule('requestAnimationFrame', callback, this.frameInterval, params);
+	};
+
+	/**
+	 * 模擬 cancelAnimationFrame：取消尚未觸發的 rAF 項目
+	 * Simulate cancelAnimationFrame: cancel a pending rAF item
+	 *
+	 * 與 clearTimeout 共用同一實作（remove）。
+	 * Shares the same implementation (remove) as clearTimeout.
+	 *
+	 * @param handle - 要取消的項目，可為佇列項目、唯一名稱或索引 / Item to cancel (queue item, name, or index)
+	 * @returns 被移除的項目，若未找到則回傳 null / The removed item, or null if not found
+	 */
+	cancelAnimationFrame = (handle?: number | string | ITimeQueueItem): null | ITimeQueueItem =>
+	{
+		return this._clear(handle);
+	};
+
+	/**
 	 * 內部取消方法：從佇列移除指定項目
 	 * Internal cancellation method: remove the specified item from the queue
 	 *
@@ -240,6 +297,43 @@ export class FakeTimer implements ITimer
 	clearImmediate = (handle?: number | string | ITimeQueueItem): null | ITimeQueueItem =>
 	{
 		return this._clear(handle);
+	};
+
+	/**
+	 * 清空所有佇列項目（取消全部排程中的計時器），不影響虛擬時鐘。
+	 * Clear all queued items (cancel every scheduled timer) without affecting the fake clock.
+	 *
+	 * 共用 QueueTimer.clear() 作為單一實作來源。
+	 * Reuses QueueTimer.clear() as the single implementation source.
+	 *
+	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
+	 */
+	clearAll = (): this =>
+	{
+		this.timer.clear();
+
+		return this;
+	};
+
+	/**
+	 * 重置整個計時器：清空佇列並將虛擬時間還原回初始值（fake_init），同時重設識別碼計數器。
+	 * Reset the whole timer: clear the queue, restore the fake clock to its initial value
+	 * (fake_init), and reset the id counter.
+	 *
+	 * 共用 QueueTimer.clear() 與 TimeCore.reset() 作為單一實作來源。
+	 * Reuses QueueTimer.clear() and TimeCore.reset() as the single implementation sources.
+	 *
+	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
+	 */
+	reset = (): this =>
+	{
+		this.timer.clear();
+		this.timer.reset();
+
+		/** 一併清空已完成項目的歷史快取 / Also clear the done-history cache */
+		this.cache.done = [];
+
+		return this;
 	};
 
 	/**
@@ -463,6 +557,177 @@ export class FakeTimer implements ITimer
 }
 
 /**
+ * 模組層級的全域時鐘安裝註冊（雙重保險之一）
+ * Module-level global-clock installation registry (one half of the double-insurance)
+ *
+ * 不為單純布林，而是一個「反安裝函式」：
+ * Not a plain boolean, but an uninstall closure:
+ *   - 未定義（undefined）與 false 同義：視為未安裝。
+ *   - undefined is equivalent to false: treated as NOT installed.
+ *   - 註冊全域時，會被指派為真正安裝該時鐘的實例所提供的反安裝函式 (() => uninstall)，
+ *     使任何實例都能委託它回到正確的實例執行還原，從而解決跨類別 / 跨實例 uninstall 的問題。
+ *   - when globally registered, it is assigned the uninstall closure provided by the instance
+ *     that actually installed the clock, so any instance can delegate the restore to the
+ *     correct one — solving the cross-instance uninstall problem.
+ */
+let _globalClockInstalled: (() => void) | undefined;
+
+/** 預設的全域「會掛載全域時鐘」Timer 實例 / Default global Timer instance that also patches the global clock */
+let globalFakeTimer: UnsafeGlobalFakeTimer;
+
+export function getUnsafeGlobalFakeTimer()
+{
+	return globalFakeTimer ??= new UnsafeGlobalFakeTimer();
+}
+
+/**
+ * 會掛載「全域時鐘」的 FakeTimer 變體（不安全）
+ * A FakeTimer variant that also patches the GLOBAL clock (UNSAFE)
+ *
+ * 此子類別集中收納具「全域副作用」的實作（installGlobalClock / uninstallGlobalClock），
+ * 它們會直接替換處理程序內的 Date.now / performance.now。核心 FakeTimer 因此保持純粹、
+ * 不污染源端全域狀態；只有在明確需要驅動依賴真實時鐘的程式碼時，才改用此類別。
+ * This subclass isolates the global-side-effect implementations (installGlobalClock /
+ * uninstallGlobalClock), which replace the process-wide Date.now / performance.now.
+ * The core FakeTimer thus stays pure and never pollutes global state; reach for this
+ * subclass only when you specifically need to drive code that reads the real clock.
+ */
+export class UnsafeGlobalFakeTimer extends FakeTimer
+{
+	/** 全域時鐘是否由「本實例」安裝 / Whether the global clock was installed by THIS instance */
+	private _clockInstalled = false;
+
+	/** 原始 Date.now 實作（用於還原）/ Original Date.now implementation (for restore) */
+	private _originalDateNow?: () => number;
+
+	/** 原始 performance.now 實作（用於還原）/ Original performance.now implementation (for restore) */
+	private _originalPerfNow?: () => number;
+
+	/**
+	 * 實際執行還原（不重入、不委派），供 installGlobalClock 註冊的全域反安裝函式呼叫。
+	 * Performs the actual restore (non-reentrant, non-delegating); invoked by the global
+	 * uninstall closure registered during installGlobalClock.
+	 */
+	private _doUninstall = (): void =>
+	{
+		if (this._originalDateNow)
+		{
+			// @ts-ignore
+			Date.now = this._originalDateNow;
+		}
+
+		const perf = (globalThis as any).performance;
+		if (perf && this._originalPerfNow)
+		{
+			perf.now = this._originalPerfNow;
+		}
+
+		this._clockInstalled = false;
+		_globalClockInstalled = undefined;
+	};
+
+	/**
+	 * 查詢全域時鐘的安裝狀態，區分是由本實例或全域（可能是其它實例）安裝。
+	 * Inspect the global-clock installation state, distinguishing whether it was installed
+	 * by THIS instance or globally (possibly by another instance).
+	 *
+	 * - 'none'   : 未安裝 / not installed
+	 * - 'this'   : 由本實例安裝 / installed by this instance
+	 * - 'global' : 已由某實例安裝（可能是其它實例）/ installed globally (possibly by another instance)
+	 */
+	globalClockState(): 'none' | 'this' | 'global'
+	{
+		if (this._clockInstalled)
+		{
+			return 'this';
+		}
+
+		return _globalClockInstalled != null ? 'global' : 'none';
+	}
+
+	/**
+	 * 將 Date.now / performance.now 替換為讀取虛擬時間，以便測試依賴真實時鐘的程式碼。
+	 * Replace Date.now / performance.now with the fake time, for testing code that reads the real clock.
+	 *
+	 * 警告：此為「全域副作用」，會影響整個處理程序。請務必配對呼叫 uninstallGlobalClock() 還原。
+	 * WARNING: this is a GLOBAL side-effect affecting the whole process. Always pair it with
+	 * uninstallGlobalClock() to restore.
+	 *
+	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
+	 */
+	installGlobalClock = (): this =>
+	{
+		// 雙重保險：本實例已安裝，或全域已註冊（未定義等同 false），即視為已安裝，避免重複掛載。
+		// Double insurance: already installed by this instance, or a global registration exists
+		// (undefined is equivalent to false) → treat as installed, preventing double-patch.
+		if (this._clockInstalled || _globalClockInstalled != null)
+		{
+			return this;
+		}
+
+		// @ts-ignore
+		this._originalDateNow = Date.now;
+
+		const perf = (globalThis as any).performance;
+		this._originalPerfNow = (perf && typeof perf.now === 'function') ? perf.now.bind(perf) : undefined;
+
+		// @ts-ignore
+		Date.now = () => this.timer.now().valueOf();
+
+		if (perf && this._originalPerfNow)
+		{
+			perf.now = () => this.timer.now().valueOf() - (this.timer.data.fake_init as dayjs.Dayjs).valueOf();
+		}
+
+		this._clockInstalled = true;
+		// 全域註冊為「反安裝函式」：任何實例都能委託它回到真正安裝的實例執行還原，
+		// 解決跨類別 / 跨實例 uninstall 的問題。未定義時與 false 同義。
+		// Register the uninstall closure globally: any instance can delegate to it to restore
+		// via the instance that actually installed the patch, solving the cross-instance problem.
+		// When undefined, it is equivalent to false (not installed).
+		_globalClockInstalled = () => this._doUninstall();
+
+		return this;
+	};
+
+	/**
+	 * 還原 Date.now / performance.now 為原始實作。
+	 * Restore Date.now / performance.now to their original implementations.
+	 *
+	 * 若全域已註冊，則委託給真正安裝的實例執行還原；否則由本實例自行還原。
+	 * If a global registration exists, delegate the restore to the instance that actually
+	 * installed it; otherwise restore directly.
+	 *
+	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
+	 */
+	uninstallGlobalClock = (): this =>
+	{
+		// 本實例未安裝且全域亦未註冊 → 無事可做
+		// Neither this instance nor the global registration is active → nothing to do.
+		if (!this._clockInstalled && _globalClockInstalled == null)
+		{
+			return this;
+		}
+
+		// 委派給全域註冊的反安裝函式（由真正安裝的實例提供），解決跨實例 uninstall。
+		// Delegate to the globally-registered uninstall closure (provided by the installing
+		// instance), solving cross-instance uninstall.
+		if (_globalClockInstalled != null)
+		{
+			_globalClockInstalled();
+
+			return this;
+		}
+
+		// 僅本實例安裝時，直接還原
+		// Only this instance installed → restore directly.
+		this._doUninstall();
+
+		return this;
+	};
+}
+
+/**
  * 預設的全域 Timer 實例
  * Default global Timer instance
  */
@@ -503,6 +768,18 @@ export const start = defaultFakeTimer.start;
 /** 便捷匯出：直接使用全域 Timer 的 startAsync（非同步）/ Convenience export: use global Timer's startAsync (async) */
 export const startAsync = defaultFakeTimer.startAsync;
 
+/** 便捷匯出：直接使用全域 Timer 的 clearAll / Convenience export: use global Timer's clearAll */
+export const clearAll = defaultFakeTimer.clearAll;
+
+/** 便捷匯出：直接使用全域 Timer 的 reset / Convenience export: use global Timer's reset */
+export const reset = defaultFakeTimer.reset;
+
+/** 便捷匯出：直接使用全域 Timer 的 requestAnimationFrame / Convenience export: use global Timer's requestAnimationFrame */
+export const requestAnimationFrame = defaultFakeTimer.requestAnimationFrame;
+
+/** 便捷匯出：直接使用全域 Timer 的 cancelAnimationFrame / Convenience export: use global Timer's cancelAnimationFrame */
+export const cancelAnimationFrame = defaultFakeTimer.cancelAnimationFrame;
+
 // @ts-ignore
 if (process.env.TSDX_FORMAT !== 'esm')
 {
@@ -529,4 +806,12 @@ if (process.env.TSDX_FORMAT !== 'esm')
 	Object.defineProperty(defaultFakeTimer, "runAsync", { value: runAsync });
 	Object.defineProperty(defaultFakeTimer, "start", { value: start });
 	Object.defineProperty(defaultFakeTimer, "startAsync", { value: startAsync });
+
+	Object.defineProperty(defaultFakeTimer, "clearAll", { value: clearAll });
+	Object.defineProperty(defaultFakeTimer, "reset", { value: reset });
+	Object.defineProperty(defaultFakeTimer, "requestAnimationFrame", { value: requestAnimationFrame });
+	Object.defineProperty(defaultFakeTimer, "cancelAnimationFrame", { value: cancelAnimationFrame });
+
+	Object.defineProperty(defaultFakeTimer, "UnsafeGlobalFakeTimer", { value: UnsafeGlobalFakeTimer });
+	Object.defineProperty(defaultFakeTimer, "getUnsafeGlobalFakeTimer", { value: getUnsafeGlobalFakeTimer });
 }

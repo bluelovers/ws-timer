@@ -188,6 +188,24 @@ export class TimeCore
 	{
 		return this.data.fake_now as dayjs.Dayjs;
 	}
+
+	/**
+	 * 將虛擬時間重置回初始值（fake_init），並重設識別碼計數器
+	 * Reset the fake time back to its initial value (fake_init) and reset the id counter
+	 *
+	 * 不影響 real_init（建立實例時捕捉的真實時間）。
+	 * Does not affect real_init (the real time captured at instance creation).
+	 *
+	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
+	 */
+	reset(): this
+	{
+		this.data.fake_now = this.data.fake_init;
+		this.data.fake_old = undefined;
+		this.data.id = 0;
+
+		return this;
+	}
 }
 
 export default TimeCore;

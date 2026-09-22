@@ -345,6 +345,24 @@ export class QueueTimer extends TimeCore
 
 		return (d >= 0);
 	};
+
+	/**
+	 * 清空整個佇列（移除所有計時器項目）
+	 * Clear the entire queue (removes all timer items)
+	 *
+	 * 不影響虛擬時間（時鐘保持不變）。
+	 * Does not affect fake time (the clock stays unchanged).
+	 *
+	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
+	 */
+	clear(): this
+	{
+		this.queue = [];
+		this.cache.min = null;
+		this.cache.max = null;
+
+		return this;
+	};
 }
 
 export default QueueTimer;
