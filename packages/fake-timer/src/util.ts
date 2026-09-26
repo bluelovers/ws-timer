@@ -7,6 +7,10 @@ import { dayjs, duration } from './dayjs';
 
 import { IDurationInput, ITimeQueueItem } from './types';
 
+// 僅需 timer 的 now()；用 type-only 匯入 TimeCore，避免與 time.ts（其值匯入 util）產生執行期循環依賴。
+// Only timer.now() is needed; type-only import of TimeCore avoids a runtime cycle with time.ts (which value-imports util).
+import type { TimeCore } from './time';
+
 /**
  * 計時器種類（鍵值相等，便於直接比較）
  * Timer kinds (keys equal values, convenient for direct comparison)
@@ -234,4 +238,26 @@ export function queueSortByTimingThenIdAsc(a: ITimeQueueItem, b: ITimeQueueItem)
 	// timing 相同 → id 小者排前面（升冪）
 	// Same timing → smaller id comes first (ascending)
 	return compareQueueItemIdAsc(a, b);
+}
+
+/**
+ * 計算佇列項目相對於「現在」的剩餘延遲（毫秒）。
+ * Compute a queue item's remaining delay (ms) relative to "now".
+ *
+ * 即 item.virtualTiming 與 timer.now() 的差值：正值表示還要等多久才觸發，
+ * 0 或負值表示已到期（含 overdue）。
+ * Returns the difference between item.virtualTiming and timer.now(): positive means how long until it
+ * fires; 0 or negative means it is due (or overdue).
+ *
+ * 只需 timer 提供 now()，因此接受 Pick<TimeCore, 'now'>，不必依賴完整的 FakeTimer / QueueTimer。
+ * Only needs timer.now(); accepts Pick<TimeCore, 'now'> so it does not depend on the full FakeTimer / QueueTimer.
+ *
+ * @param timer - 提供 now() 的時間來源（TimeCore / QueueTimer / FakeTimer.timer 等）
+ *   / time source exposing now() (TimeCore / QueueTimer / FakeTimer.timer, etc.)
+ * @param item - 佇列項目 / the queue item
+ * @returns 剩餘延遲毫秒數 / remaining delay in ms
+ */
+export function remainingDelayMilliseconds(timer: Pick<TimeCore, 'now'>, item: ITimeQueueItem): number
+{
+	return item.virtualTiming.diff(timer.now());
 }

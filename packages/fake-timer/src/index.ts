@@ -76,6 +76,22 @@ export class FakeTimer implements ITimer
 	}
 
 	/**
+	 * 取得目前的虛擬時間（dayjs）；實作上直接委派給內部 timer（TimeCore）的 now()。
+	 * Get the current virtual time (dayjs); delegates directly to the internal timer (TimeCore).now().
+	 *
+	 * 因為 FakeTimer 暴露 now() 這一個方法，它就符合 Pick<TimeCore, 'now'> 的形狀——
+	 * 可直接做為「只需要時間來源」的輔助函式的參數傳入（例如 util.remainingDelayMilliseconds(timer, item)），
+	 * 不必再深入取用 .timer。
+	 * Because FakeTimer exposes now(), it matches the shape of Pick<TimeCore, 'now'> — so it can be
+	 * passed directly as the time-source argument to helpers that need nothing but "now"
+	 * (e.g. util.remainingDelayMilliseconds(timer, item)), without reaching into .timer.
+	 */
+	public now()
+	{
+		return this.timer.now();
+	}
+
+	/**
 	 * 自建立以來經過的「虛擬」毫秒數（number，非 dayjs）。
 	 * Elapsed VIRTUAL milliseconds since creation (number, not dayjs).
 	 *
