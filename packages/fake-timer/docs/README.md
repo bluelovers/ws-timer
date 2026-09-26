@@ -91,6 +91,11 @@ setTimeout((current, self, ...rest) => {
 - 回呼內的 `this` **不是** FakeTimer，而是 `current` 佇列項目本身；請用 `self` 取得 FakeTimer，不要依賴 `this`。
 - 第 3 個起的 `...params` 來自 `setTimeout(func, delay, ...args)`，觸發時原樣轉交（對齊 Web/API/Window.setTimeout）；
   `setInterval` 每次重排都沿用同一組 `params`。
+- `current.added` 是**註冊時間**（排程當下的虛擬時間）；`current.timing` 是預計觸發時間（絕對虛擬時間）。
+- 想算「從起始時間到觸發過了多久（虛擬）」：`self.timer.now().diff(self.timer.data.fake_init)`（觸發時 `now()` 即 `current.timing`，差值 = delay）。
+  - 例：`setTimeout(cb, 250)` 觸發時 `elapsed = 250`；`setImmediate(cb)` 觸發時 `elapsed = 0`。
+- `current.count` 是**已觸發次數**（每次執行回呼 +1；一次性 timer 固定為 `1`）。週期性 `setInterval` 可讀它判斷目前是第幾次觸發。
+  - 例：`setInterval(cb, 50)` 連續觸發時，回呼內 `current.count` 依次為 `1, 2, 3, …`。
 
 ### 2.2 對齊標準 setTimeout 用法 / Standard setTimeout usage
 

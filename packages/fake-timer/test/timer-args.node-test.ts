@@ -181,6 +181,40 @@ describe('Timer args — Web/API/Window.setTimeout compatibility', () =>
 
 		assert.equal(fired, 1);
 	});
+
+	it('callback can read registration time (current.added) and elapsed delay from start', () =>
+	{
+		const t = new Timer();
+		const infos: any[] = [];
+		const registeredAt = t.timer.now().valueOf(); // 排程當下的虛擬時間
+
+		t.setTimeout((current, self) => {
+			infos.push({
+				added: current.added?.valueOf(),
+				elapsed: self.timer.now().diff(self.timer.data.fake_init),
+			});
+		}, 250);
+
+		t.start(250);
+
+		assert.equal(infos.length, 1);
+		assert.equal(infos[0].added, registeredAt); // 註冊時間 = 排程當下虛擬時間
+		assert.equal(infos[0].elapsed, 250);        // 從起始時間過了 250ms（虛擬 delay）
+	});
+
+	it('setInterval callback can read current.count (fire count)', () =>
+	{
+		const t = new Timer();
+		const counts: number[] = [];
+
+		t.setInterval((current) => {
+			counts.push(current.count ?? -1);
+		}, 50);
+
+		t.start(200); // 預期在 50/100/150/200 觸發 → 4 次
+
+		assert.deepEqual(counts, [1, 2, 3, 4]);
+	});
 });
 
 describe('normalizeDelay (shared delay validation)', () =>

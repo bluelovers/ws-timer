@@ -76,6 +76,12 @@ export interface ITimeQueueItem
 	/** 預計觸發時間 / Scheduled trigger time */
 	timing?: dayjs.Dayjs;
 
+	/** 註冊時間（排程當下的虛擬時間）/ Registration time (virtual time when scheduled) */
+	added?: dayjs.Dayjs;
+
+	/** 已觸發次數（每次執行回呼 +1；一次性 timer 固定為 1）/ Fire count (incremented per callback; 1 for one-shot) */
+	count?: number;
+
 	/** 實際開始執行時間 / Actual start execution time */
 	active?: dayjs.Dayjs;
 
@@ -231,6 +237,8 @@ export class QueueTimer extends TimeCore
 			id: this.id(),
 			name: nanoid(),
 			timing: dayjs.isDuration(q.timing) ? this.now().add(q.timing) : q.timing,
+			added: this.now(),
+			count: 0,
 			index: this.length,
 		});
 

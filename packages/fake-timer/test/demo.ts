@@ -10,6 +10,8 @@ setTimeout(function (current, self)
 	console.log('timer a id', current.id, {
 		selfIsFakeTimer: self === defaultFakeTimer,
 		selfTimerLength: self.timer.length,
+		registrationTime: current.added?.valueOf(),
+		elapsedFromStartMs: self.timer.now().diff(self.timer.data.fake_init),
 		current,
 	});
 }, 1500);
@@ -19,6 +21,8 @@ let q = setTimeout(function (current, self)
 	console.log('timer b id', current.id, {
 		selfIsFakeTimer: self === defaultFakeTimer,
 		selfTimerLength: self.timer.length,
+		registrationTime: current.added?.valueOf(),
+		elapsedFromStartMs: self.timer.now().diff(self.timer.data.fake_init),
 		current,
 	});
 }, 500);
@@ -28,6 +32,8 @@ setImmediate(function (current, self)
 	console.log('setImmediate id', current.id, {
 		selfIsFakeTimer: self === defaultFakeTimer,
 		selfTimerNow: self.timer.now().valueOf(),
+		registrationTime: current.added?.valueOf(),
+		elapsedFromStartMs: self.timer.now().diff(self.timer.data.fake_init),
 		current,
 	});
 });

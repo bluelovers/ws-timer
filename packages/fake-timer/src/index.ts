@@ -795,6 +795,8 @@ export class FakeTimer implements ITimer
 
 		for (const current of this._gen)
 		{
+			current.count = (current.count ?? 0) + 1;
+
 			await current.callback(current, this, ...(current.params ?? []));
 		}
 
@@ -810,6 +812,8 @@ export class FakeTimer implements ITimer
 	{
 		for (const current of this._runCore())
 		{
+			current.count = (current.count ?? 0) + 1;
+
 			current.callback(current, this, ...(current.params ?? []));
 
 			yield current;
