@@ -9,8 +9,8 @@ dayjs.extend(duration);
 class TimeCore {
   data = {};
   /**
-   * 建立 Time 實例
-   * Create a Time instance
+   * 建立 Time 實例（內部；公開請用 `new FakeTimer()`）。
+   * Create a Time instance (internal; prefer `new FakeTimer()` publicly).
    *
    * @param options - 時間配置選項，可為 ITimeData 物件或直接傳入日期值 / Time config options, can be ITimeData object or a date value directly
    */
@@ -23,8 +23,8 @@ class TimeCore {
     this.data = Object.assign(this.data, {
       id: 0,
       real_init: dayjs(),
-      fake_init: now,
-      fake_now: now
+      virtual_init: now,
+      virtual_now: now
     }, options);
     this._init();
   }
@@ -48,21 +48,24 @@ class TimeCore {
     return false;
   }
   update(amount = 100, unit) {
-    this.data.fake_old = this.data.fake_now;
+    this.data.virtual_old = this.data.virtual_now;
     if (dayjs.isDuration(amount)) {
-      this.data.fake_now = this.data.fake_now.add(amount);
+      this.data.virtual_now = this.data.virtual_now.add(amount);
     } else if (typeof amount == 'object') {
-      this.data.fake_now = dayjs(amount);
+      this.data.virtual_now = dayjs(amount);
     } else if (unit || typeof amount == 'number') {
-      this.data.fake_now = this.data.fake_now.add(amount, unit);
+      this.data.virtual_now = this.data.virtual_now.add(amount, unit);
     } else {
-      this.data.fake_now = this.data.fake_now.add(100);
+      this.data.virtual_now = this.data.virtual_now.add(100);
     }
     return this;
   }
   /**
-   * 取得或遞增識別碼
-   * Get or increment the identifier
+   * 取得或遞增識別碼（內部計數器）
+   * Get or increment the identifier (internal counter)
+   *
+   * 公開識別計時器請用佇列項目的 id / name，或 FakeTimer.clear* 的 ITimerHandle。
+   * To identify timers publicly, use the item's id / name or the ITimerHandle of FakeTimer.clear*.
    *
    * @param bool - 若為 true 則僅回傳當前值不遞增，若為 false 或省略則回傳後遞增 / If true returns current value without increment, otherwise returns and increments
    */
@@ -70,20 +73,23 @@ class TimeCore {
     return bool ? this.data.id : this.data.id++;
   }
   now() {
-    return this.data.fake_now;
+    return this.data.virtual_now;
   }
   /**
-   * 將虛擬時間重置回初始值（fake_init），並重設識別碼計數器
-   * Reset the fake time back to its initial value (fake_init) and reset the id counter
+   * 將虛擬時間重置回初始值（virtual_init），並重設識別碼計數器
+   * Reset the virtual time back to its initial value (virtual_init) and reset the id counter
    *
    * 不影響 real_init（建立實例時捕捉的真實時間）。
    * Does not affect real_init (the real time captured at instance creation).
    *
+   * 內部方法 / Internal method：公開請改用 FakeTimer.reset()。
+   * Internal: prefer FakeTimer.reset().
+   *
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
    */
   reset() {
-    this.data.fake_now = this.data.fake_init;
-    this.data.fake_old = undefined;
+    this.data.virtual_now = this.data.virtual_init;
+    this.data.virtual_old = undefined;
     this.data.id = 0;
     return this;
   }
@@ -103,8 +109,8 @@ let EnumTimerType = /*#__PURE__*/function (EnumTimerType) {
  * 計時器回呼函式介面
  * Timer callback function interface
  *
- * @param current - 當前執行的佇列項目 / The currently executing queue item
- * @param timer - 所屬的 QueueTimer 實例 / The owning QueueTimer instance
+ * @param current - 當前執行的佇列項目（同時是回呼內的 `this`）/ The currently executing queue item (also `this` inside the callback)
+ * @param self - 所屬的 FakeTimer 實例 / The owning FakeTimer instance
  */
 
 class QueueTimer extends TimeCore {
@@ -120,24 +126,27 @@ class QueueTimer extends TimeCore {
     return this.queue.length;
   }
   add = q => {
-    q.timing = q.timing || this.now();
+    const now = this.now();
+    q.virtualTiming = q.virtualTiming || now;
     q = Object.assign({
       id: null,
       name: null,
-      timing: null
+      virtualTiming: null
     }, q, {
       id: this.id(),
       name: nanoid.nanoid(),
-      timing: dayjs.isDuration(q.timing) ? this.now().add(q.timing) : q.timing,
+      virtualTiming: dayjs.isDuration(q.virtualTiming) ? now.add(q.virtualTiming) : q.virtualTiming,
+      virtualAdded: now,
+      count: 0,
       index: this.length
     });
-    this._cache_timing(q.timing);
+    this._cache_timing(q.virtualTiming);
     this.queue.push(q);
     return q;
   };
   _cache_refresh = () => {
-    this.cache.min = this.length ? this.eq(0).timing : null;
-    this.cache.max = this.length ? this.eq(-1).timing : null;
+    this.cache.min = this.length ? this.eq(0).virtualTiming : null;
+    this.cache.max = this.length ? this.eq(-1).virtualTiming : null;
   };
   /**
    * 增量更新快取的時間邊界
@@ -160,6 +169,11 @@ class QueueTimer extends TimeCore {
    *
    * @param cb - 自訂排序函式，若未提供則使用 data.sort 或預設排序
    *             Custom sort function; if not provided, uses data.sort or default sort
+   *
+   * 內部實作 / Internal implementation：公開請改用 FakeTimer 的 set* / start / run 來排程與執行；
+   * 直接排序內部佇列會繞過 time-jump 防護與快取不變式（見 docs/anti-patterns.md）。
+   * Internal: prefer FakeTimer's set* / start / run for scheduling and execution; sorting the
+   * internal queue directly bypasses the time-jump guard and cache invariants (see docs/anti-patterns.md).
    */
   sort = cb => {
     let self = this;
@@ -167,7 +181,7 @@ class QueueTimer extends TimeCore {
     this._cache_timing(null, true);
     this.queue.map(function (q, index) {
       q.index = index;
-      self._cache_timing(q.timing);
+      self._cache_timing(q.virtualTiming);
     });
     return this;
   };
@@ -186,6 +200,9 @@ class QueueTimer extends TimeCore {
   /**
    * 依索引移除佇列項目（內部方法）
    * Remove queue item by index (internal method)
+   *
+   * 避免直接呼叫；公開移除計時器請用 FakeTimer.clear*。
+   * Avoid calling directly; use FakeTimer.clear* to remove timers publicly.
    *
    * @returns 被移除的項目，若移除失敗則回傳 null / Removed item, or null if removal failed
    */
@@ -224,7 +241,10 @@ class QueueTimer extends TimeCore {
    * Clear the entire queue (removes all timer items)
    *
    * 不影響虛擬時間（時鐘保持不變）。
-   * Does not affect fake time (the clock stays unchanged).
+   * Does not affect virtual time (the clock stays unchanged).
+   *
+   * 內部實作 / Internal implementation：公開請改用 FakeTimer.clearAll()。
+   * Internal: prefer FakeTimer.clearAll().
    *
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
    */
@@ -236,22 +256,50 @@ class QueueTimer extends TimeCore {
   }
 }
 function queueSortCallback(a, b) {
-  let d = a.timing.diff(b.timing);
+  let d = a.virtualTiming.diff(b.virtualTiming);
   if (d == 0) {
     return a.id > b.id;
   }
-  return a.timing.diff(b.timing);
+  return a.virtualTiming.diff(b.virtualTiming);
 }
 
 dayjs.extend(duration);
 function toDuration(value) {
   return dayjs.isDuration(value) ? value : dayjs.duration(value);
 }
+/**
+ * 驗證並正規化 delay，對齊標準 Web API 的處理方式（集中複用，不在各呼叫點重複寫死）。
+ * Validate and normalize a delay, aligning with the standard Web API (shared/reusable, not inlined).
+ *
+ * 規則 / Rules:
+ * - `undefined` / `null` → `0`（對齊 `setTimeout(func)` 省略 delay）。
+ * - 數值非有限（Infinity / -Infinity / NaN）→ 拋 `RangeError`（避免產生失控計時器）。
+ * - `dayjs.Duration` 解析後非有限（dayjs.duration(NaN) / dayjs.duration(Infinity)）→ 拋 `RangeError`。
+ * - 負數 delay → 箝成 `0`（標準 Web API：timeout < 0 視為 0）。
+ *
+ * @returns 有限且有效的 delay（number | duration.Duration）
+ */
+function normalizeDelay(delay) {
+  const value = delay !== null && delay !== void 0 ? delay : 0;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new RangeError(`fake-timer: delay must be a finite number; received ${String(delay)} ` + `(Infinity / -Infinity / NaN are not allowed — they create uncontrolled timers).`);
+    }
+    return value < 0 ? 0 : value;
+  }
+  if (!Number.isFinite(value.asMilliseconds())) {
+    throw new RangeError(`fake-timer: delay Duration must resolve to a finite number of milliseconds; received ${String(delay)} ` + `(dayjs.duration(NaN) / dayjs.duration(Infinity) are not allowed).`);
+  }
+  return value.asMilliseconds() < 0 ? 0 : value;
+}
 class FakeTimer {
   cache = {
     done: []
   };
   frameInterval = dayjs.duration(1000 / 60);
+  get initTime() {
+    return this.timer.data.virtual_init;
+  }
   _activeRun = null;
   _gen = null;
   _runStartNow = null;
@@ -283,10 +331,12 @@ class FakeTimer {
    */
   _schedule(type, callback, delay, params) {
     var _this$_activeRun;
+    const validatedDelay = normalizeDelay(delay);
+    const timing = toDuration(validatedDelay);
     const item = this.timer.add({
       callback: callback,
-      timing: toDuration(delay),
-      interval: type === EnumTimerType.setInterval ? toDuration(delay) : undefined,
+      virtualTiming: timing,
+      interval: type === EnumTimerType.setInterval ? timing : undefined,
       params: params,
       type: type
     });
@@ -299,6 +349,9 @@ class FakeTimer {
    *
    * 同步 API：直接回傳佇列項目，不回傳 Promise。
    * Synchronous API: returns the queue item directly (no Promise).
+   *
+   * @see start - 推進虛擬時間並執行到期回呼（優先使用）/ advance + run (preferred)
+   * @see run - 只執行到期回呼（不推進時間）/ run only
    *
    * @param callback - 到期時執行的回呼函式 / Callback function to execute on expiry
    * @param delay - 延遲時間，可為毫秒數或 Duration 物件 / Delay time, can be milliseconds or Duration object
@@ -316,6 +369,9 @@ class FakeTimer {
    * Synchronous API: returns the queue item directly. Periodic repetition is handled
    * uniformly by run / runAsync.
    *
+   * @see start - 推進虛擬時間並執行到期回呼（優先使用）/ advance + run (preferred)
+   * @see run - 只執行到期回呼（不推進時間）/ run only
+   *
    * @param callback - 每次間隔到期時執行的回呼函式 / Callback to execute each interval
    * @param delay - 間隔時間，可為毫秒數或 Duration 物件 / Interval time, can be milliseconds or Duration object
    * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
@@ -330,6 +386,9 @@ class FakeTimer {
    *
    * 同步 API：直接回傳佇列項目，不回傳 Promise。
    * Synchronous API: returns the queue item directly (no Promise).
+   *
+   * @see start - 推進虛擬時間並執行到期回呼（優先使用）/ advance + run (preferred)
+   * @see run - 只執行到期回呼（不推進時間）/ run only
    *
    * @param callback - 要立即執行的回呼函式 / Callback to execute immediately
    * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
@@ -349,6 +408,9 @@ class FakeTimer {
    *
    * 同步 API：直接回傳佇列項目，不回傳 Promise。
    * Synchronous API: returns the queue item directly (no Promise).
+   *
+   * @see start - 推進虛擬時間並執行到期回呼（優先使用）/ advance + run (preferred)
+   * @see run - 只執行到期回呼（不推進時間）/ run only
    *
    * @param callback - 影格觸發時執行的回呼函式 / Callback to execute on the frame
    * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
@@ -433,9 +495,9 @@ class FakeTimer {
     return this;
   };
   /**
-   * 重置整個計時器：清空佇列並將虛擬時間還原回初始值（fake_init），同時重設識別碼計數器。
+   * 重置整個計時器：清空佇列並將虛擬時間還原回初始值（virtual_init），同時重設識別碼計數器。
    * Reset the whole timer: clear the queue, restore the fake clock to its initial value
-   * (fake_init), and reset the id counter.
+   * (virtual_init), and reset the id counter.
    *
    * 共用 QueueTimer.clear() 與 TimeCore.reset() 作為單一實作來源。
    * Reuses QueueTimer.clear() and TimeCore.reset() as the single implementation sources.
@@ -450,13 +512,19 @@ class FakeTimer {
   };
   /**
    * 推進虛擬時間（同步，不執行任何回呼）
-   * Advance fake time (synchronous; does not run any callbacks)
+   * Advance virtual time (synchronous; does not run any callbacks)
    *
    * 若 amount 為負數，改用佇列中最早的時間作為推進量（跳轉至最早到期項目）。
    * If amount is negative, jump to the earliest expiry by using the queue's minimum timing.
    *
    * 佇列為空時 cache.min 為 null，此時無最早時間可跳轉，改用 0（不推進）。
    * When the queue is empty, cache.min is null; fall back to 0 (no advance).
+   *
+   * 優先使用 / Prefer：
+   *   絕大多數情況請用 `start()`（= `advance()` + `run()`）。只有在你刻意「只想移動時間、稍後再 `run()`」
+   *   時，才單獨呼叫 `advance()`。
+   *   Prefer `start()` (= `advance()` + `run()`) in almost all cases; call `advance()` alone only when you
+   *   deliberately want to move time without running yet.
    *
    * @param amount - 推進的時間量，可為毫秒數或 Duration 物件 / Amount of time to advance
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
@@ -488,7 +556,7 @@ class FakeTimer {
         var _m$id, _item$id;
         const mid = lo + hi >> 1;
         const m = pending[mid];
-        const d = m.timing.diff(item.timing);
+        const d = m.virtualTiming.diff(item.virtualTiming);
         if (d < 0 || d === 0 && ((_m$id = m.id) !== null && _m$id !== void 0 ? _m$id : 0) < ((_item$id = item.id) !== null && _item$id !== void 0 ? _item$id : 0)) {
           lo = mid + 1;
         } else {
@@ -502,7 +570,7 @@ class FakeTimer {
         return;
       }
       seen.add(item);
-      if (now.diff(item.timing) >= 0) {
+      if (now.diff(item.virtualTiming) >= 0) {
         insert(item);
       }
     };
@@ -516,33 +584,33 @@ class FakeTimer {
       while (pending.length > 0) {
         const current = pending[0];
         this._current = current;
-        if (now.diff(current.timing) < 0) {
+        if (now.diff(current.virtualTiming) < 0) {
           break;
         }
         if (!this.timer.queue.includes(current)) {
           pending.shift();
           continue;
         }
-        current.active = dayjs();
+        current.realActive = dayjs();
         yield current;
         if (this._abort) {
           break;
         }
-        current.ending = dayjs();
+        current.realEnding = dayjs();
         this.cache.done.push(current);
         pending.shift();
         if (!this.timer.queue.includes(current)) {
           continue;
         }
         if (current.type === EnumTimerType.setInterval && current.interval != null) {
-          const oldTiming = current.timing;
+          const oldTiming = current.virtualTiming;
           const nextTiming = oldTiming.add(current.interval);
           if (nextTiming.valueOf() > oldTiming.valueOf() && nextTiming.valueOf() <= now.valueOf()) {
-            current.timing = nextTiming;
+            current.virtualTiming = nextTiming;
             insert(current);
             continue;
           }
-          current.timing = nextTiming;
+          current.virtualTiming = nextTiming;
         } else {
           this.timer.remove(current);
         }
@@ -562,6 +630,8 @@ class FakeTimer {
    *
    * 以同步方式呼叫每個回呼（若回呼回傳 Promise 則不等待其完成）。
    * Invokes each callback synchronously (does not wait for any returned Promise).
+   *
+   * @see start - 若想「推進時間 + 執行」一次完成，請改用 start() / use start() to advance + run at once
    *
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
    */
@@ -593,13 +663,17 @@ class FakeTimer {
     }
     this._gen = this._runCore();
     for (const current of this._gen) {
-      await current.callback(current, this.timer);
+      var _current$count, _current$params;
+      current.count = ((_current$count = current.count) !== null && _current$count !== void 0 ? _current$count : 0) + 1;
+      await current.callback(current, this, ...((_current$params = current.params) !== null && _current$params !== void 0 ? _current$params : []));
     }
     return this;
   };
   *_wrapRunGen() {
     for (const current of this._runCore()) {
-      current.callback(current, this.timer);
+      var _current$count2, _current$params2;
+      current.count = ((_current$count2 = current.count) !== null && _current$count2 !== void 0 ? _current$count2 : 0) + 1;
+      current.callback(current, this, ...((_current$params2 = current.params) !== null && _current$params2 !== void 0 ? _current$params2 : []));
       yield current;
     }
   }
@@ -648,7 +722,7 @@ class FakeTimer {
   }
   /**
    * 推進虛擬時間並同步執行到期的計時器
-   * Advance fake time and synchronously run expired timers
+   * Advance virtual time and synchronously run expired timers
    *
    * @param amount - 推進的時間量，可為毫秒數或 Duration 物件 / Amount of time to advance
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
@@ -666,7 +740,7 @@ class FakeTimer {
   };
   /**
    * 推進虛擬時間並非同步執行到期的計時器
-   * Advance fake time and asynchronously run expired timers
+   * Advance virtual time and asynchronously run expired timers
    *
    * @param amount - 推進的時間量，可為毫秒數或 Duration 物件 / Amount of time to advance
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
@@ -692,6 +766,18 @@ class FakeTimer {
    * item, so the remaining timers keep their relative order and can resume later from where
    * we left off.
    *
+   * 使用時機 / When to use：
+   *   僅在 run / start / runAsync / startAsync 執行回呼「期間」有意義；run 之外呼叫為 no-op。
+   *   適用於「想在回呼內中斷本輪、保留剩餘計時器、稍後再從中斷處續跑」的特殊需求。
+   *   Only meaningful WHILE a run is executing callbacks; a no-op otherwise. Use it when you need
+   *   to halt the current run from inside a callback yet keep the remaining timers to resume later.
+   *
+   * 優先使用 / Prefer：
+   *   一般推進與執行請用 `start()` / `run()`；若只是想移除某些計時器，請用 `clear*`（`clear` 主 API）。
+   *   `pause()` 僅供回呼內「中斷並保留進度」之用，不應作為常規流程。
+   *   For ordinary advance+run use `start()` / `run()`; to drop timers use `clear*` (`clear` is a
+   *   main API). `pause()` is only for halting-from-callback while preserving progress.
+   *
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
    */
   pause = () => {
@@ -702,8 +788,8 @@ class FakeTimer {
     this.timer.sort();
     let next = null;
     for (const q of this.timer.queue) {
-      if (q !== cur && (next == null || q.timing.diff(next) < 0)) {
-        next = q.timing;
+      if (q !== cur && (next == null || q.virtualTiming.diff(next) < 0)) {
+        next = q.virtualTiming;
       }
     }
     this._abort = true;
@@ -711,7 +797,7 @@ class FakeTimer {
       this.timer.remove(cur);
     }
     if (next) {
-      this.timer.data.fake_now = next;
+      this.timer.data.virtual_now = next;
     }
     return this;
   };
@@ -722,6 +808,18 @@ class FakeTimer {
    *
    * 佇列中的計時器保持不變（僅不再執行本輪剩餘項目）。
    * Timers in the queue are left unchanged (only the rest of this run is aborted).
+   *
+   * 使用時機 / When to use：
+   *   僅在 run / start / runAsync / startAsync 執行回呼「期間」有意義；run 之外呼叫為 no-op。
+   *   適用於「想放棄本輪剩餘項目，並把虛擬時間撤銷回 run 開始前」的場景（如測試中斷言失敗後還原）。
+   *   Only meaningful WHILE a run is executing callbacks; a no-op otherwise. Use it to abandon the
+   *   rest of a run and roll the virtual clock back to its pre-run value.
+   *
+   * 優先使用 / Prefer：
+   *   一般推進與執行請用 `start()` / `run()`；若只是想移除計時器，請用 `clear*`（`clear` 主 API）。
+   *   `cancel()` 僅供回呼內「撤銷本次 run 的時間跳躍」，不應作為常規流程。
+   *   For ordinary advance+run use `start()` / `run()`; to drop timers use `clear*`. `cancel()` only
+   *   undoes the run's time jump from within a callback.
    *
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
    */
@@ -736,7 +834,7 @@ class FakeTimer {
       this.timer.remove(cur);
     }
     if (startNow) {
-      this.timer.data.fake_now = startNow;
+      this.timer.data.virtual_now = startNow;
     }
     return this;
   };
@@ -774,11 +872,22 @@ class UnsafeGlobalFakeTimer extends FakeTimer {
   }
   /**
    * 將 Date.now / performance.now 替換為讀取虛擬時間，以便測試依賴真實時鐘的程式碼。
-   * Replace Date.now / performance.now with the fake time, for testing code that reads the real clock.
+   * Replace Date.now / performance.now with the virtual time, for testing code that reads the real clock.
    *
    * 警告：此為「全域副作用」，會影響整個處理程序。請務必配對呼叫 uninstallGlobalClock() 還原。
    * WARNING: this is a GLOBAL side-effect affecting the whole process. Always pair it with
    * uninstallGlobalClock() to restore.
+   *
+   * 使用時機 / When to use：
+   *   僅當待測程式「直接」讀取 `Date.now()` / `performance.now()`（而非接收時間參數）時才需要。
+   *   Only when the code under test reads `Date.now()` / `performance.now()` DIRECTLY.
+   *
+   * 優先使用 / Prefer：
+   *   若待測程式接受時間參數、或使用本庫的 `set*` / `start`，請用純 `FakeTimer`（不污染源端全域狀態）。
+   *   本方法是「不安全」的全域副作用，請在測試結尾（或 `finally`）一律配對 `uninstallGlobalClock()` 還原。
+   *   Prefer the plain `FakeTimer` (no global pollution) whenever the code accepts time params or uses
+   *   this library's `set*` / `start`. This method is an UNSAFE global side-effect — always pair it
+   *   with `uninstallGlobalClock()` at the end (or in `finally`).
    *
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
    */
@@ -793,7 +902,7 @@ class UnsafeGlobalFakeTimer extends FakeTimer {
     // @ts-ignore
     Date.now = () => this.timer.now().valueOf();
     if (perf && this._originalPerfNow) {
-      perf.now = () => this.timer.now().valueOf() - this.timer.data.fake_init.valueOf();
+      perf.now = () => this.timer.now().valueOf() - this.timer.data.virtual_init.valueOf();
     }
     this._clockInstalled = true;
     _globalClockInstalled = () => this._doUninstall();
@@ -806,6 +915,14 @@ class UnsafeGlobalFakeTimer extends FakeTimer {
    * 若全域已註冊，則委託給真正安裝的實例執行還原；否則由本實例自行還原。
    * If a global registration exists, delegate the restore to the instance that actually
    * installed it; otherwise restore directly.
+   *
+   * 使用時機 / When to use：
+   *   在測試結束、或任何 `installGlobalClock()` 之後，還原被替換的全域 `Date.now` / `performance.now`。
+   *   After `installGlobalClock()` (or at test teardown) to restore the patched globals.
+   *
+   * 優先使用 / Prefer：
+   *   每次 `installGlobalClock()` 都「必須」配對呼叫本方法；跨實例亦安全（會委託給真正安裝的實例）。
+   *   Every `installGlobalClock()` MUST be paired with this call; it is cross-instance safe.
    *
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
    */
@@ -857,6 +974,9 @@ const cancelAnimationFrame = defaultFakeTimer.cancelAnimationFrame;
   });
   Object.defineProperty(defaultFakeTimer, "toDuration", {
     value: toDuration
+  });
+  Object.defineProperty(defaultFakeTimer, "normalizeDelay", {
+    value: normalizeDelay
   });
   Object.defineProperty(defaultFakeTimer, "setTimeout", {
     value: setTimeout

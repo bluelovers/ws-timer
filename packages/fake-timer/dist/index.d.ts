@@ -3,57 +3,60 @@ import duration from 'dayjs/plugin/duration';
 
 /**
  * 時間資料介面，儲存真實時間與虛擬時間的狀態
- * Time data interface, stores real time and fake time state
+ * Time data interface, stores real time and virtual time state
  */
 export interface ITimeDataCore {
 	/** 自增識別碼 / Auto-increment identifier */
 	id?: number;
 	/** 真實世界初始時間（建立 Time 實例時的實際時間） / Real-world initial time (actual time when Time instance was created) */
 	real_init?: dayjs.Dayjs;
-	/** 虛擬時間初始值 / Fake time initial value */
-	fake_init?: dayjs.Dayjs;
-	/** 虛擬時間當前值（隨 update 推進） / Fake time current value (advanced via update) */
-	fake_now?: dayjs.Dayjs;
-	/** 上一次 update 前的虛擬時間（用於回溯或差值計算） / Fake time before last update (used for rollback or diff calculation) */
-	fake_old?: dayjs.Dayjs;
+	/** 虛擬時間初始值 / Virtual time initial value */
+	virtual_init?: dayjs.Dayjs;
+	/** 虛擬時間當前值（隨 update 推進） / Virtual time current value (advanced via update) */
+	virtual_now?: dayjs.Dayjs;
+	/** 上一次 update 前的虛擬時間（用於回溯或差值計算） / Virtual time before last update (used for rollback or diff calculation) */
+	virtual_old?: dayjs.Dayjs;
 }
 /**
  * 時間基礎類別，提供可控的虛擬時間環境
- * Base time class providing a controllable fake time environment
+ * Base time class providing a controllable virtual time environment
  *
  * 此類別是整個 fake-timer 的核心，管理真實時間與虛擬時間的映射。
  * 透過 update() 方法可任意推進虛擬時間，用於測試或模擬計時器行為。
- * This class is the core of the fake-timer, managing the mapping between real time and fake time.
+ * This class is the core of the fake-timer, managing the mapping between real time and virtual time.
  * The virtual time can be advanced arbitrarily via update() for testing or simulating timer behavior.
  */
 export declare class TimeCore {
-	/** 時間狀態資料 / Time state data */
+	/** 時間狀態資料（內部）；含 real_init / virtual_init / virtual_now / virtual_old 等；避免直接操作，請用 FakeTimer 公開 API。 / Time state data (internal): real_init / virtual_init / virtual_now / virtual_old etc.; avoid direct access — use FakeTimer's public API. */
 	data: ITimeDataCore;
 	/**
-	 * 建立 Time 實例
-	 * Create a Time instance
+	 * 建立 Time 實例（內部；公開請用 `new FakeTimer()`）。
+	 * Create a Time instance (internal; prefer `new FakeTimer()` publicly).
 	 *
 	 * @param options - 時間配置選項，可為 ITimeData 物件或直接傳入日期值 / Time config options, can be ITimeData object or a date value directly
 	 */
 	constructor(options?: ITimeDataCore);
 	/**
-	 * 子類初始化鉤子（dayjs 為 immutable，無需 clone）
-	 * Subclass initialization hook (dayjs is immutable, no clone needed)
+	 * 子類初始化鉤子（內部；dayjs 為 immutable，無需 clone）
+	 * Subclass initialization hook (internal; dayjs is immutable, no clone needed)
 	 */
 	_init(): void;
 	/**
-	 * 工廠方法，建立 Time 實例
-	 * Factory method to create a Time instance
+	 * 工廠方法（內部）；公開請用 `new FakeTimer()`。
+	 * Factory method (internal); prefer `new FakeTimer()` publicly.
 	 */
 	static new(options?: ITimeDataCore): TimeCore;
 	/**
-	 * 取得當前類別的建構函式（用於 static 方法中引用子類）
-	 * Get the constructor of the current class (used in static methods to reference subclasses)
+	 * 取得當前類別的建構函式（內部；用於 static 方法中引用子類）
+	 * Get the constructor of the current class (internal; used in static methods to reference subclasses)
 	 */
 	get static(): any;
 	/**
-	 * 驗證傳入值是否為有效的日期表示
-	 * Validate whether the passed value is a valid date representation
+	 * 驗證傳入值是否為有效的日期表示（內部輔助）
+	 * Validate whether the passed value is a valid date representation (internal helper)
+	 *
+	 * 公開不需要直接使用。
+	 * Not needed publicly.
 	 *
 	 * 支援的型別：dayjs.Dayjs、Date、數字（時間戳）、可解析的日期字串
 	 * Supported types: dayjs.Dayjs, Date, number (timestamp), parseable date string
@@ -61,40 +64,56 @@ export declare class TimeCore {
 	static isValidDate(who: any): boolean;
 	/**
 	 * 推進虛擬時間
-	 * Advance the fake time
+	 * Advance the virtual time
 	 *
-	 * 根據不同型別的參數推進 fake_now：
-	 * Advances fake_now based on different parameter types:
+	 * 根據不同型別的參數推進 virtual_now：
+	 * Advances virtual_now based on different parameter types:
 	 * - Duration 物件 → 直接加算 / Duration object → add directly
 	 * - 物件（Date 等）→ 直接設定為該時間 / Object (Date etc.) → set to that time
 	 * - 數字 + unit → 加算指定單位 / Number + unit → add specified unit
 	 * - 純數字 → 預設加算 100 毫秒 / Number alone → add 100ms by default
+	 *
+	 * 內部方法 / Internal method：公開推進虛擬時間請改用 FakeTimer.advance() / start()；
+	 * 直接呼叫會繞過 time-jump 防護與快取不變式。
+	 * Internal: prefer FakeTimer.advance() / start() to advance time; calling this directly
+	 * bypasses the time-jump guard and cache invariants.
 	 */
 	update(amount?: any, unit?: dayjs.ManipulateType): this;
 	/**
-	 * 取得或遞增識別碼
-	 * Get or increment the identifier
+	 * 取得或遞增識別碼（內部計數器）
+	 * Get or increment the identifier (internal counter)
+	 *
+	 * 公開識別計時器請用佇列項目的 id / name，或 FakeTimer.clear* 的 ITimerHandle。
+	 * To identify timers publicly, use the item's id / name or the ITimerHandle of FakeTimer.clear*.
 	 *
 	 * @param bool - 若為 true 則僅回傳當前值不遞增，若為 false 或省略則回傳後遞增 / If true returns current value without increment, otherwise returns and increments
 	 */
 	id(bool?: boolean): number;
 	/**
-	 * 取得當前虛擬時間
-	 * Get the current fake time
+	 * 取得當前虛擬時間（dayjs.Dayjs，非數值）。
+	 * Get the current virtual time (dayjs.Dayjs, NOT a number).
+	 *
+	 * 這是 FakeTimer 回呼內 `self.timer.now()` 讀取的時鐘；計算「自建立以來經過的毫秒數」
+	 * 請用 `now().diff(virtual_init)`（或 FakeTimer.initTime）。
+	 * This is the clock read via `self.timer.now()` inside callbacks. To compute elapsed ms
+	 * since creation, use `now().diff(virtual_init)` (or FakeTimer.initTime).
 	 */
 	now(): dayjs.Dayjs;
 	/**
-	 * 將虛擬時間重置回初始值（fake_init），並重設識別碼計數器
-	 * Reset the fake time back to its initial value (fake_init) and reset the id counter
+	 * 將虛擬時間重置回初始值（virtual_init），並重設識別碼計數器
+	 * Reset the virtual time back to its initial value (virtual_init) and reset the id counter
 	 *
 	 * 不影響 real_init（建立實例時捕捉的真實時間）。
 	 * Does not affect real_init (the real time captured at instance creation).
+	 *
+	 * 內部方法 / Internal method：公開請改用 FakeTimer.reset()。
+	 * Internal: prefer FakeTimer.reset().
 	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
 	reset(): this;
 }
-/** 虛擬時間或時間區間的聯合型別 / Union type for fake time or time duration */
+/** 虛擬時間或時間區間的聯合型別 / Union type for virtual time or time duration */
 export type IDayMoment = dayjs.Dayjs | duration.Duration;
 /**
  * 計時器種類（鍵值相等，便於直接比較）
@@ -145,22 +164,30 @@ export type IRemovedTimer = null | ITimeQueueItem;
  * Each item represents a queued timer, containing execution time, callback, etc.
  */
 export interface ITimeQueueItem {
-	/** 自增識別碼 / Auto-increment identifier */
+	/** 自增識別碼（number）；可作為 clear* / remove 的 ITimerHandle / Auto-increment id (number); usable as an ITimerHandle for clear* / remove */
 	id?: number;
-	/** 預計觸發時間 / Scheduled trigger time */
-	timing?: dayjs.Dayjs;
-	/** 實際開始執行時間 / Actual start execution time */
-	active?: dayjs.Dayjs;
-	/** 執行結束時間 / Execution end time */
-	ending?: dayjs.Dayjs;
-	/** 隨機唯一識別碼（nanoid）/ Random unique identifier (nanoid) */
+	/** 預計觸發時間（絕對虛擬時間）；觸發時等於 now() / Scheduled trigger time (absolute virtual time); equals now() at fire */
+	virtualTiming?: dayjs.Dayjs;
+	/** 註冊時間（排程當下的虛擬時間）；`now().diff(virtualAdded)` 即原始 delay / Registration time (virtual time when scheduled); `now().diff(virtualAdded)` gives the original delay */
+	virtualAdded?: dayjs.Dayjs;
+	/** 已觸發次數（每次執行回呼 +1；一次性 timer 固定為 1）；週期性 setInterval 可讀它判斷第幾次 / Fire count (incremented per callback; 1 for one-shot); setInterval reads it for the Nth fire */
+	count?: number;
+	/** 實際「開始」執行的時間；注意是**真實牆鐘**（dayjs()），非虛擬時間 / Actual execution START time — note: REAL wall-clock (dayjs()), not virtual time */
+	realActive?: dayjs.Dayjs;
+	/** 執行「結束」時間（回呼返回後才寫入）；同為**真實牆鐘**；`realEnding.diff(realActive)` 即回呼真實耗時 / Execution END time (written after the callback returns); also REAL wall-clock; `realEnding.diff(realActive)` is the real callback duration */
+	realEnding?: dayjs.Dayjs;
+	/** 隨機唯一識別碼（nanoid 字串）；可作為 clear* / remove 的 ITimerHandle / Random unique id (nanoid string); usable as an ITimerHandle */
 	name?: string;
 	/** 到期時呼叫的回呼函式 / Callback function to invoke on expiry */
 	callback?: ICallback;
-	/** 傳遞給回呼函式的額外參數 / Additional parameters passed to the callback */
+	/** 傳遞給回呼的額外引數（即 `setTimeout(func, delay, ...params)` 的 ...params）/ Extra args forwarded to the callback (the ...params of setTimeout(func, delay, ...params)) */
 	params?: any[];
 	/** 計時器種類 / Timer kind */
 	type?: EnumTimerType;
+	/** 週期（僅 setInterval 有意義，為 dayjs.Duration）；其它種類為 undefined / Period (only meaningful for setInterval, a dayjs.Duration); undefined for others */
+	interval?: duration.Duration;
+	/** 加入佇列時的陣列索引（排序後可能變動，僅供參考）/ Array index at insertion (may shift after sorting; informational only) */
+	index?: number;
 	/** 允許額外任意屬性 / Allow any additional properties */
 	[key: string]: any;
 }
@@ -170,7 +197,7 @@ export interface ITimeQueueItem {
  */
 export interface ITimeQueueItemAdd extends ITimeQueueItem {
 	/** 可為 Dayjs 或 Duration（Duration 會在加入時轉換為絕對時間）/ Can be Dayjs or Duration (Duration is converted to absolute time when added) */
-	timing?: IDayMoment | number | any;
+	virtualTiming?: IDayMoment | number | any;
 }
 /**
  * 時間資料擴展介面，加入排序回呼
@@ -191,11 +218,25 @@ export interface ISortCallback extends Function {
  * 計時器回呼函式介面
  * Timer callback function interface
  *
- * @param current - 當前執行的佇列項目 / The currently executing queue item
- * @param timer - 所屬的 QueueTimer 實例 / The owning QueueTimer instance
+ * @param current - 當前執行的佇列項目（同時是回呼內的 `this`）/ The currently executing queue item (also `this` inside the callback)
+ * @param self - 所屬的 FakeTimer 實例 / The owning FakeTimer instance
  */
 export interface ICallback extends Function {
-	(current: ITimeQueueItem, timer: QueueTimer, self?: any): any;
+	/**
+	 * 回呼簽章：第 2 個參數 `self` 即所屬的 FakeTimer 實例。
+	 * Callback signature: the 2nd parameter `self` is the owning FakeTimer instance.
+	 *
+	 * 想拿佇列或虛擬時鐘請走 `self.timer`，不要依賴回呼內的 `this`
+	 * （`this` 永遠是 `current` 佇列項目本身）。
+	 * To reach the queue or the virtual clock, use `self.timer`; do not rely on `this`
+	 * inside the callback (`this` is always the `current` queue item).
+	 *
+	 * `...params` 是呼叫 `setTimeout(func, delay, ...params)` 時傳入的額外引數，
+	 * 觸發時會原樣轉交給回呼（對齊 Web/API/Window.setTimeout 用法）。
+	 * `...params` are the extra arguments passed to `setTimeout(func, delay, ...params)`,
+	 * forwarded verbatim to the callback when it fires (aligns with Web/API/Window.setTimeout).
+	 */
+	(current: ITimeQueueItem, self: FakeTimer, ...params: any[]): void;
 }
 /**
  * 佇列式計時器，繼承 Time 類別
@@ -207,15 +248,15 @@ export interface ICallback extends Function {
  * All timer items are stored in the queue array, with min/max times tracked via cache for performance.
  */
 export declare class QueueTimer extends TimeCore {
-	/** 計時器佇列 / Timer queue */
+	/** 內部佇列（ITimeQueueItem[]）；避免直接操作，請用 FakeTimer 公開 API；見 docs/README.md §8 / Internal queue (ITimeQueueItem[]); avoid direct access — use FakeTimer's public API (see docs/README.md §8) */
 	queue: ITimeQueueItem[];
-	/** 快取佇列中的最小與最大時間 / Cache for min and max times in the queue */
+	/** 內部快取：佇列時間邊界（min / max）；避免直接操作，見 docs/anti-patterns.md 與 docs/README.md §8 / Internal cache: queue time boundaries (min / max); avoid direct access (see docs/anti-patterns.md, docs/README.md §8) */
 	cache: any;
-	/** 覆寫父類的 data 型別 / Override parent class data type */
+	/** 內部狀態（real_init / virtual_init / virtual_now / virtual_old 等）；避免直接操作，請用 FakeTimer 公開 API；見 docs/README.md §8 / Internal state (real_init / virtual_init / virtual_now / virtual_old etc.); avoid direct access (see docs/README.md §8) */
 	data: ITimeData;
 	constructor();
 	/**
-	 * 佇列中项目的數量 / Number of items in the queue
+	 * 佇列中項目的數量 / Number of items in the queue
 	 */
 	get length(): number;
 	/**
@@ -227,9 +268,16 @@ export declare class QueueTimer extends TimeCore {
 	 * 2. 若 timing 為 Duration，轉換為絕對時間（now + duration）
 	 * 3. 產生唯一 id 與 name，推入佇列
 	 * Processing flow:
-	 * 1. If timing not specified, use current fake time
+	 * 1. If timing not specified, use current virtual time
 	 * 2. If timing is Duration, convert to absolute time (now + duration)
 	 * 3. Generate unique id and name, push to queue
+	 *
+	 * 內部實作 / Internal implementation：公開排程請改用 FakeTimer 的 setTimeout / setInterval /
+	 * setImmediate / requestAnimationFrame；直接呼叫會繞過 delay 正規化（normalizeDelay）與統一的回呼
+	 * 簽章處理（current / self / ...params）。
+	 * Internal: prefer FakeTimer's setTimeout / setInterval / setImmediate / requestAnimationFrame for
+	 * scheduling; calling this directly bypasses delay normalization (normalizeDelay) and the unified
+	 * callback-signature handling (current / self / ...params).
 	 */
 	add: (q: ITimeQueueItemAdd) => ITimeQueueItem;
 	/**
@@ -254,6 +302,11 @@ export declare class QueueTimer extends TimeCore {
 	 *
 	 * @param cb - 自訂排序函式，若未提供則使用 data.sort 或預設排序
 	 *             Custom sort function; if not provided, uses data.sort or default sort
+	 *
+	 * 內部實作 / Internal implementation：公開請改用 FakeTimer 的 set* / start / run 來排程與執行；
+	 * 直接排序內部佇列會繞過 time-jump 防護與快取不變式（見 docs/anti-patterns.md）。
+	 * Internal: prefer FakeTimer's set* / start / run for scheduling and execution; sorting the
+	 * internal queue directly bypasses the time-jump guard and cache invariants (see docs/anti-patterns.md).
 	 */
 	sort: (cb?: ISortCallback) => this;
 	/**
@@ -266,6 +319,9 @@ export declare class QueueTimer extends TimeCore {
 	/**
 	 * 依索引移除佇列項目（內部方法）
 	 * Remove queue item by index (internal method)
+	 *
+	 * 避免直接呼叫；公開移除計時器請用 FakeTimer.clear*。
+	 * Avoid calling directly; use FakeTimer.clear* to remove timers publicly.
 	 *
 	 * @returns 被移除的項目，若移除失敗則回傳 null / Removed item, or null if removal failed
 	 */
@@ -282,11 +338,16 @@ export declare class QueueTimer extends TimeCore {
 	 * - Number index (used directly as array index)
 	 * - Queue item object (uses its name property for matching)
 	 * - Name string (nanoid-generated unique code)
+	 *
+	 * 內部實作 / Internal implementation：公開請改用 FakeTimer 的 clearTimeout / clearInterval /
+	 * clearImmediate；本方法僅做底層佇列移除，不附帶任何「語意層」保證。
+	 * Internal: prefer FakeTimer's clearTimeout / clearInterval / clearImmediate; this method only
+	 * performs the low-level queue removal without any semantic-layer guarantees.
 	 */
 	remove: (id: ITimerHandle) => IRemovedTimer;
 	/**
-	 * 靜態工廠方法，建立 QueueTimer 實例
-	 * Static factory method to create a QueueTimer instance
+	 * 靜態工廠方法（內部）；公開請用 `new FakeTimer()` 取得計時器。
+	 * Static factory (internal); prefer `new FakeTimer()` to obtain a timer publicly.
 	 */
 	static new(options?: ITimeData): QueueTimer;
 	/**
@@ -295,8 +356,11 @@ export declare class QueueTimer extends TimeCore {
 	 *
 	 * 判斷邏輯：比較當前虛擬時間與佇列中最早的時間（cache.min）
 	 * 若差值 >= 0 則表示至少有一個項目已到期
-	 * Logic: compare current fake time with the earliest time in queue (cache.min)
+	 * Logic: compare current virtual time with the earliest time in queue (cache.min)
 	 * If diff >= 0, at least one item has expired
+	 *
+	 * 內部用途 / Internal use：公開判斷是否還有到期項目請直接呼叫 FakeTimer 的 start / run 觸發。
+	 * Internal: to actually trigger expired items, call FakeTimer's start / run.
 	 */
 	hasExpires: () => boolean;
 	/**
@@ -304,7 +368,10 @@ export declare class QueueTimer extends TimeCore {
 	 * Clear the entire queue (removes all timer items)
 	 *
 	 * 不影響虛擬時間（時鐘保持不變）。
-	 * Does not affect fake time (the clock stays unchanged).
+	 * Does not affect virtual time (the clock stays unchanged).
+	 *
+	 * 內部實作 / Internal implementation：公開請改用 FakeTimer.clearAll()。
+	 * Internal: prefer FakeTimer.clearAll().
 	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
@@ -315,8 +382,8 @@ export declare class QueueTimer extends TimeCore {
  * Timer function interface, supporting number or Duration delay
  */
 export interface ITimerFunc extends Function {
-	(callback: ICallback, delay: number, ...params: any[]): ITimeQueueItem;
-	(callback: ICallback, delay: duration.Duration, ...params: any[]): ITimeQueueItem;
+	(callback: ICallback, delay?: number, ...params: any[]): ITimeQueueItem;
+	(callback: ICallback, delay?: duration.Duration, ...params: any[]): ITimeQueueItem;
 }
 /**
  * 計時器介面，提供標準的 setTimeout / setInterval / setImmediate API
@@ -335,7 +402,9 @@ export interface ITimer {
 	clearInterval(handle?: ITimerHandle): IRemovedTimer;
 	/** 模擬原生 clearImmediate / Simulate native clearImmediate */
 	clearImmediate(handle?: ITimerHandle): IRemovedTimer;
-	/** 推進虛擬時間（同步，不執行回呼）/ Advance fake time (synchronous, does not run callbacks) */
+	/** 取得虛擬時鐘的初始時間（t=0 基準），不必操作底層 `timer.data` / Get the initial virtual clock time (t=0 reference), without touching the underlying `timer.data` */
+	readonly initTime: dayjs.Dayjs;
+	/** 推進虛擬時間（同步，不執行回呼）/ Advance virtual time (synchronous, does not run callbacks) */
 	advance(amount?: IDurationInput): this;
 	/** 同步執行所有到期項目（不等待回呼）/ Synchronously run expired items (does not await callbacks) */
 	run(): this;
@@ -343,9 +412,9 @@ export interface ITimer {
 	runAsync(): Promise<this>;
 	/** 以生成器逐個執行到期項目並回傳生成器（不回傳 this）/ Run expired items one-by-one as a generator (does NOT return this) */
 	runGenerator(): Generator<ITimeQueueItem, void, void>;
-	/** 推進虛擬時間並同步執行到期項目 / Advance fake time and synchronously run expired items */
+	/** 推進虛擬時間並同步執行到期項目 / Advance virtual time and synchronously run expired items */
 	start(amount?: IDurationInput): this;
-	/** 推進虛擬時間並非同步執行到期項目 / Advance fake time and asynchronously run expired items */
+	/** 推進虛擬時間並非同步執行到期項目 / Advance virtual time and asynchronously run expired items */
 	startAsync(amount?: IDurationInput): Promise<this>;
 	/** 暫停進行中的 run，並將虛擬時間修正為下一個待執行項目的觸發時間 / Pause the in-progress run and correct virtual time to the next pending item's timing */
 	pause(): this;
@@ -369,6 +438,19 @@ export interface ITimer {
  */
 export declare function toDuration(value: IDurationInput): duration.Duration;
 /**
+ * 驗證並正規化 delay，對齊標準 Web API 的處理方式（集中複用，不在各呼叫點重複寫死）。
+ * Validate and normalize a delay, aligning with the standard Web API (shared/reusable, not inlined).
+ *
+ * 規則 / Rules:
+ * - `undefined` / `null` → `0`（對齊 `setTimeout(func)` 省略 delay）。
+ * - 數值非有限（Infinity / -Infinity / NaN）→ 拋 `RangeError`（避免產生失控計時器）。
+ * - `dayjs.Duration` 解析後非有限（dayjs.duration(NaN) / dayjs.duration(Infinity)）→ 拋 `RangeError`。
+ * - 負數 delay → 箝成 `0`（標準 Web API：timeout < 0 視為 0）。
+ *
+ * @returns 有限且有效的 delay（number | duration.Duration）
+ */
+export declare function normalizeDelay(delay: IDurationInput | null | undefined): IDurationInput;
+/**
  * 可控計時器類別，實作 ITimer 介面
  * Controllable timer class implementing the ITimer interface
  *
@@ -385,13 +467,36 @@ export declare class FakeTimer implements ITimer {
 		done: ITimeQueueItem[];
 	};
 	/**
-	 * 每個影格（frame）的間隔，供 requestAnimationFrame 使用
-	 * Per-frame interval used by requestAnimationFrame
+	 * 每個影格（frame）的間隔，供 requestAnimationFrame 使用。
+	 * Per-frame interval used by requestAnimationFrame.
+	 *
+	 * 使用時機 / When to use：
+	 *   僅在使用 `requestAnimationFrame` 時有意義；預設 1000/60 ms（約 60fps）。
+	 *   Only relevant when using `requestAnimationFrame`; defaults to 1000/60 ms (~60fps).
+	 *
+	 * 優先使用 / Prefer：
+	 *   一般計時器（`setTimeout` / `setInterval`）不受 `frameInterval` 影響，請用其各自 `delay` 控制間隔；
+	 *   只有在想模擬不同刷新率時，才覆寫本屬性。
+	 *   Ordinary timers (`setTimeout` / `setInterval`) ignore `frameInterval` — control them via their own
+	 *   `delay`; only override this when simulating a different refresh rate.
 	 *
 	 * 預設為 1000/60 毫秒（約 60fps）。可直接覆寫以模擬不同刷新率。
 	 * Defaults to 1000/60 ms (~60fps). Override directly to simulate other refresh rates.
 	 */
 	frameInterval: duration.Duration;
+	/**
+	 * 虛擬時鐘的初始時間（t=0 基準），唯讀。
+	 * The initial virtual clock time (t=0 reference), read-only.
+	 *
+	 * 使用時機 / When to use：
+	 *   需要「自建立以來經過的毫秒數」時：`self.timer.now().diff(self.initTime)`。
+	 *   Use it to compute elapsed virtual time since creation: `self.timer.now().diff(self.initTime)`.
+	 *
+	 * 優先使用 / Prefer：
+	 *   請用 `initTime` 取代直接讀取底層 `timer.data.virtual_init` —— 這是公開取值 API，不必操作內部 `data`。
+	 *   Prefer `initTime` over reaching into the internal `timer.data.virtual_init`; this is the public accessor.
+	 */
+	get initTime(): dayjs.Dayjs;
 	/**
 	 * 內部 run 狀態（pending 即為內部 API）。
 	 * Internal run state (pending is the internal API).
@@ -461,12 +566,15 @@ export declare class FakeTimer implements ITimer {
 	 * 同步 API：直接回傳佇列項目，不回傳 Promise。
 	 * Synchronous API: returns the queue item directly (no Promise).
 	 *
+	 * @see start - 推進虛擬時間並執行到期回呼（優先使用）/ advance + run (preferred)
+	 * @see run - 只執行到期回呼（不推進時間）/ run only
+	 *
 	 * @param callback - 到期時執行的回呼函式 / Callback function to execute on expiry
 	 * @param delay - 延遲時間，可為毫秒數或 Duration 物件 / Delay time, can be milliseconds or Duration object
 	 * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
 	 * @returns 新增的佇列項目 / The newly added queue item
 	 */
-	setTimeout: (callback: ICallback, delay: IDurationInput, ...params: any[]) => ITimeQueueItem;
+	setTimeout: (callback: ICallback, delay?: IDurationInput, ...params: any[]) => ITimeQueueItem;
 	/**
 	 * 模擬 setInterval：將回呼函式排入佇列，以指定間隔重複執行
 	 * Simulate setInterval: queue a callback to execute repeatedly at specified intervals
@@ -475,18 +583,24 @@ export declare class FakeTimer implements ITimer {
 	 * Synchronous API: returns the queue item directly. Periodic repetition is handled
 	 * uniformly by run / runAsync.
 	 *
+	 * @see start - 推進虛擬時間並執行到期回呼（優先使用）/ advance + run (preferred)
+	 * @see run - 只執行到期回呼（不推進時間）/ run only
+	 *
 	 * @param callback - 每次間隔到期時執行的回呼函式 / Callback to execute each interval
 	 * @param delay - 間隔時間，可為毫秒數或 Duration 物件 / Interval time, can be milliseconds or Duration object
 	 * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
 	 * @returns 新增的佇列項目 / The newly added queue item
 	 */
-	setInterval: (callback: ICallback, delay: IDurationInput, ...params: any[]) => ITimeQueueItem;
+	setInterval: (callback: ICallback, delay?: IDurationInput, ...params: any[]) => ITimeQueueItem;
 	/**
 	 * 模擬 setImmediate：將回呼函式排入佇列，於下次執行時立即觸發
 	 * Simulate setImmediate: queue a callback to trigger immediately on next run
 	 *
 	 * 同步 API：直接回傳佇列項目，不回傳 Promise。
 	 * Synchronous API: returns the queue item directly (no Promise).
+	 *
+	 * @see start - 推進虛擬時間並執行到期回呼（優先使用）/ advance + run (preferred)
+	 * @see run - 只執行到期回呼（不推進時間）/ run only
 	 *
 	 * @param callback - 要立即執行的回呼函式 / Callback to execute immediately
 	 * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
@@ -504,6 +618,9 @@ export declare class FakeTimer implements ITimer {
 	 *
 	 * 同步 API：直接回傳佇列項目，不回傳 Promise。
 	 * Synchronous API: returns the queue item directly (no Promise).
+	 *
+	 * @see start - 推進虛擬時間並執行到期回呼（優先使用）/ advance + run (preferred)
+	 * @see run - 只執行到期回呼（不推進時間）/ run only
 	 *
 	 * @param callback - 影格觸發時執行的回呼函式 / Callback to execute on the frame
 	 * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
@@ -570,9 +687,9 @@ export declare class FakeTimer implements ITimer {
 	 */
 	clearAll: () => this;
 	/**
-	 * 重置整個計時器：清空佇列並將虛擬時間還原回初始值（fake_init），同時重設識別碼計數器。
+	 * 重置整個計時器：清空佇列並將虛擬時間還原回初始值（virtual_init），同時重設識別碼計數器。
 	 * Reset the whole timer: clear the queue, restore the fake clock to its initial value
-	 * (fake_init), and reset the id counter.
+	 * (virtual_init), and reset the id counter.
 	 *
 	 * 共用 QueueTimer.clear() 與 TimeCore.reset() 作為單一實作來源。
 	 * Reuses QueueTimer.clear() and TimeCore.reset() as the single implementation sources.
@@ -582,13 +699,19 @@ export declare class FakeTimer implements ITimer {
 	reset: () => this;
 	/**
 	 * 推進虛擬時間（同步，不執行任何回呼）
-	 * Advance fake time (synchronous; does not run any callbacks)
+	 * Advance virtual time (synchronous; does not run any callbacks)
 	 *
 	 * 若 amount 為負數，改用佇列中最早的時間作為推進量（跳轉至最早到期項目）。
 	 * If amount is negative, jump to the earliest expiry by using the queue's minimum timing.
 	 *
 	 * 佇列為空時 cache.min 為 null，此時無最早時間可跳轉，改用 0（不推進）。
 	 * When the queue is empty, cache.min is null; fall back to 0 (no advance).
+	 *
+	 * 優先使用 / Prefer：
+	 *   絕大多數情況請用 `start()`（= `advance()` + `run()`）。只有在你刻意「只想移動時間、稍後再 `run()`」
+	 *   時，才單獨呼叫 `advance()`。
+	 *   Prefer `start()` (= `advance()` + `run()`) in almost all cases; call `advance()` alone only when you
+	 *   deliberately want to move time without running yet.
 	 *
 	 * @param amount - 推進的時間量，可為毫秒數或 Duration 物件 / Amount of time to advance
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
@@ -616,6 +739,8 @@ export declare class FakeTimer implements ITimer {
 	 *
 	 * 以同步方式呼叫每個回呼（若回呼回傳 Promise 則不等待其完成）。
 	 * Invokes each callback synchronously (does not wait for any returned Promise).
+	 *
+	 * @see start - 若想「推進時間 + 執行」一次完成，請改用 start() / use start() to advance + run at once
 	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
@@ -671,7 +796,7 @@ export declare class FakeTimer implements ITimer {
 	runGenerator(): Generator<ITimeQueueItem, void, void>;
 	/**
 	 * 推進虛擬時間並同步執行到期的計時器
-	 * Advance fake time and synchronously run expired timers
+	 * Advance virtual time and synchronously run expired timers
 	 *
 	 * @param amount - 推進的時間量，可為毫秒數或 Duration 物件 / Amount of time to advance
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
@@ -679,7 +804,7 @@ export declare class FakeTimer implements ITimer {
 	start: (amount?: IDurationInput) => this;
 	/**
 	 * 推進虛擬時間並非同步執行到期的計時器
-	 * Advance fake time and asynchronously run expired timers
+	 * Advance virtual time and asynchronously run expired timers
 	 *
 	 * @param amount - 推進的時間量，可為毫秒數或 Duration 物件 / Amount of time to advance
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
@@ -695,6 +820,18 @@ export declare class FakeTimer implements ITimer {
 	 * item, so the remaining timers keep their relative order and can resume later from where
 	 * we left off.
 	 *
+	 * 使用時機 / When to use：
+	 *   僅在 run / start / runAsync / startAsync 執行回呼「期間」有意義；run 之外呼叫為 no-op。
+	 *   適用於「想在回呼內中斷本輪、保留剩餘計時器、稍後再從中斷處續跑」的特殊需求。
+	 *   Only meaningful WHILE a run is executing callbacks; a no-op otherwise. Use it when you need
+	 *   to halt the current run from inside a callback yet keep the remaining timers to resume later.
+	 *
+	 * 優先使用 / Prefer：
+	 *   一般推進與執行請用 `start()` / `run()`；若只是想移除某些計時器，請用 `clear*`（`clear` 主 API）。
+	 *   `pause()` 僅供回呼內「中斷並保留進度」之用，不應作為常規流程。
+	 *   For ordinary advance+run use `start()` / `run()`; to drop timers use `clear*` (`clear` is a
+	 *   main API). `pause()` is only for halting-from-callback while preserving progress.
+	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
 	pause: () => this;
@@ -706,10 +843,38 @@ export declare class FakeTimer implements ITimer {
 	 * 佇列中的計時器保持不變（僅不再執行本輪剩餘項目）。
 	 * Timers in the queue are left unchanged (only the rest of this run is aborted).
 	 *
+	 * 使用時機 / When to use：
+	 *   僅在 run / start / runAsync / startAsync 執行回呼「期間」有意義；run 之外呼叫為 no-op。
+	 *   適用於「想放棄本輪剩餘項目，並把虛擬時間撤銷回 run 開始前」的場景（如測試中斷言失敗後還原）。
+	 *   Only meaningful WHILE a run is executing callbacks; a no-op otherwise. Use it to abandon the
+	 *   rest of a run and roll the virtual clock back to its pre-run value.
+	 *
+	 * 優先使用 / Prefer：
+	 *   一般推進與執行請用 `start()` / `run()`；若只是想移除計時器，請用 `clear*`（`clear` 主 API）。
+	 *   `cancel()` 僅供回呼內「撤銷本次 run 的時間跳躍」，不應作為常規流程。
+	 *   For ordinary advance+run use `start()` / `run()`; to drop timers use `clear*`. `cancel()` only
+	 *   undoes the run's time jump from within a callback.
+	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
 	cancel: () => this;
 }
+/**
+ * 取得全域時鐘變體（UnsafeGlobalFakeTimer）的惰性單例。
+ * Get the lazy singleton of the global-clock variant (UnsafeGlobalFakeTimer).
+ *
+ * 使用時機 / When to use：
+ *   需要一個「會替換全域 Date.now / performance.now」的 Timer 實例時，用本函式取得共享單例，
+ *   避免重複 `new` 出多個互不配對的安裝實例。
+ *   When you need a Timer that patches the global clock — use this shared singleton instead of
+ *   `new UnsafeGlobalFakeTimer()` repeatedly.
+ *
+ * 優先使用 / Prefer：
+ *   絕大多數場景請用純 `FakeTimer`；只有待測程式依賴真實全域時鐘、且你已準備好配對
+ *   `uninstallGlobalClock()` 還原時，才使用本函式。
+ *   Prefer the plain `FakeTimer` in almost all cases; reach for this only when driving code that
+ *   depends on the real global clock and you are prepared to restore it.
+ */
 export declare function getUnsafeGlobalFakeTimer(): UnsafeGlobalFakeTimer;
 /**
  * 會掛載「全域時鐘」的 FakeTimer 變體（不安全）
@@ -759,17 +924,36 @@ export declare class UnsafeGlobalFakeTimer extends FakeTimer {
 	 * by THIS instance or globally (possibly by another instance).
 	 *
 	 * - 'none'   : 未安裝 / not installed
-	 * - 'this'   : 由本實例安裝 / installed by this instance
+	 * - 'self'   : 由本實例安裝 / installed by this instance
 	 * - 'global' : 已由某實例安裝（可能是其它實例）/ installed globally (possibly by another instance)
+	 *
+	 * 使用時機 / When to use：
+	 *   診斷目前全域時鐘安裝狀態，特別是跨實例安裝、需要確認「是否已有人安裝」時。
+	 *   Diagnose the global-clock state, e.g. when multiple instances may install.
+	 *
+	 * 優先使用 / Prefer：
+	 *   這是診斷 / 除錯用途，不影響排程；正常的排程與推進請用 `set*` / `start`，不要用它來控制時間流程。
+	 *   Diagnostic only — it does not affect scheduling. Use `set*` / `start` for the actual flow.
 	 */
 	globalClockState(): EnumGlobalClockState;
 	/**
 	 * 將 Date.now / performance.now 替換為讀取虛擬時間，以便測試依賴真實時鐘的程式碼。
-	 * Replace Date.now / performance.now with the fake time, for testing code that reads the real clock.
+	 * Replace Date.now / performance.now with the virtual time, for testing code that reads the real clock.
 	 *
 	 * 警告：此為「全域副作用」，會影響整個處理程序。請務必配對呼叫 uninstallGlobalClock() 還原。
 	 * WARNING: this is a GLOBAL side-effect affecting the whole process. Always pair it with
 	 * uninstallGlobalClock() to restore.
+	 *
+	 * 使用時機 / When to use：
+	 *   僅當待測程式「直接」讀取 `Date.now()` / `performance.now()`（而非接收時間參數）時才需要。
+	 *   Only when the code under test reads `Date.now()` / `performance.now()` DIRECTLY.
+	 *
+	 * 優先使用 / Prefer：
+	 *   若待測程式接受時間參數、或使用本庫的 `set*` / `start`，請用純 `FakeTimer`（不污染源端全域狀態）。
+	 *   本方法是「不安全」的全域副作用，請在測試結尾（或 `finally`）一律配對 `uninstallGlobalClock()` 還原。
+	 *   Prefer the plain `FakeTimer` (no global pollution) whenever the code accepts time params or uses
+	 *   this library's `set*` / `start`. This method is an UNSAFE global side-effect — always pair it
+	 *   with `uninstallGlobalClock()` at the end (or in `finally`).
 	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
@@ -782,6 +966,14 @@ export declare class UnsafeGlobalFakeTimer extends FakeTimer {
 	 * If a global registration exists, delegate the restore to the instance that actually
 	 * installed it; otherwise restore directly.
 	 *
+	 * 使用時機 / When to use：
+	 *   在測試結束、或任何 `installGlobalClock()` 之後，還原被替換的全域 `Date.now` / `performance.now`。
+	 *   After `installGlobalClock()` (or at test teardown) to restore the patched globals.
+	 *
+	 * 優先使用 / Prefer：
+	 *   每次 `installGlobalClock()` 都「必須」配對呼叫本方法；跨實例亦安全（會委託給真正安裝的實例）。
+	 *   Every `installGlobalClock()` MUST be paired with this call; it is cross-instance safe.
+	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
 	uninstallGlobalClock: () => this;
@@ -792,9 +984,9 @@ export declare class UnsafeGlobalFakeTimer extends FakeTimer {
  */
 export declare const defaultFakeTimer: FakeTimer;
 /** 便捷匯出：直接使用全域 Timer 的 setTimeout / Convenience export: use global Timer's setTimeout */
-declare const setTimeout$1: (callback: ICallback, delay: IDurationInput, ...params: any[]) => ITimeQueueItem;
+declare const setTimeout$1: (callback: ICallback, delay?: IDurationInput, ...params: any[]) => ITimeQueueItem;
 /** 便捷匯出：直接使用全域 Timer 的 setInterval / Convenience export: use global Timer's setInterval */
-declare const setInterval$1: (callback: ICallback, delay: IDurationInput, ...params: any[]) => ITimeQueueItem;
+declare const setInterval$1: (callback: ICallback, delay?: IDurationInput, ...params: any[]) => ITimeQueueItem;
 /** 便捷匯出：直接使用全域 Timer 的 setImmediate / Convenience export: use global Timer's setImmediate */
 declare const setImmediate$1: (callback: ICallback, ...params: any[]) => ITimeQueueItem;
 /** 便捷匯出：直接使用全域 Timer 的 clearTimeout / Convenience export: use global Timer's clearTimeout */
