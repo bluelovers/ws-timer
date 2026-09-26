@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.0.2](https://github.com/bluelovers/ws-timer/compare/fake-timer@3.0.1...fake-timer@3.0.2) (2026-09-26)
+
+
+
+### ✨　Features
+
+* **fake-timer:** 新增 elapsedMilliseconds 屬性以取得經過的虛擬毫秒數 ([f767467](https://github.com/bluelovers/ws-timer/commit/f767467215fd1d62664b62101f6ae0e8aa5edb8e))
+
+
+### 📦　Code Refactoring
+
+* **fake-timer:** 重構 dayjs 初始化邏輯以集中管理插件 ([30c463f](https://github.com/bluelovers/ws-timer/commit/30c463f78fee70fb3e2ac5f7e5adb99dc52c63fc))
+
+
+### 🛠　Build System
+
+* **fake-timer:** 更新編譯產物並優化內部工具函式 ([a2fba4b](https://github.com/bluelovers/ws-timer/commit/a2fba4becf825ff84be828079797023f9f097485))
+
+
+
 ## [3.0.1](https://github.com/bluelovers/ws-timer/compare/fake-timer@3.0.0...fake-timer@3.0.1) (2026-09-26)
 
 
