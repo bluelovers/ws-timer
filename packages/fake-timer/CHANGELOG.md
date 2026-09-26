@@ -3,6 +3,44 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [3.0.0](https://github.com/bluelovers/ws-timer/compare/fake-timer@2.0.2...fake-timer@3.0.0) (2026-09-26)
+
+
+### BREAKING CHANGES
+
+* **fake-timer:** 優化回呼函數簽章並修正參數傳遞
+
+
+
+### ✨　Features
+
+* **fake-timer:** 新增 initTime 公開 API 以取得虛擬時鐘初始時間 ([4e01475](https://github.com/bluelovers/ws-timer/commit/4e01475ecf5094bcad1810374331f455a4888b3e))
+* **fake-timer:** 擴充計時器狀態資訊，新增註冊時間與觸發次數追蹤 ([da57d6b](https://github.com/bluelovers/ws-timer/commit/da57d6b87b15cb0ad1da481c720a62e3cedc74a9))
+* **fake-timer:** 支援 setTimeout 額外參數轉交與延遲參數選填 ([8e2058f](https://github.com/bluelovers/ws-timer/commit/8e2058f643fcc0957bd6a769e721efb757a5fde7))
+
+
+### 📦　Code Refactoring
+
+* **fake-timer:** 將內部屬性命名由 fake 改為 virtual 以提升語意清晰度 ([7d030c4](https://github.com/bluelovers/ws-timer/commit/7d030c4508367c2094eee4000226648b39c24fa3))
+* **fake-timer:** 優化內部實作細節並強化註釋說明 ([d123ed5](https://github.com/bluelovers/ws-timer/commit/d123ed59da749c5ac01ba7f2b7e46bac1accacb1))
+* **fake-timer:** 實作 delay 正規化邏輯與錯誤檢查 ([2de01f0](https://github.com/bluelovers/ws-timer/commit/2de01f0d69a8d86d5d3b565973cb88b6390376f6))
+* **fake-timer:** 優化回呼函數簽章並修正參數傳遞 ([847356f](https://github.com/bluelovers/ws-timer/commit/847356f0b633b3ce11917f173b9a4d045e6eba35))
+* **queue:** 優化計時器新增時的時間戳記一致性 ([e2eb0d2](https://github.com/bluelovers/ws-timer/commit/e2eb0d23e37ce1c9d72b45708e6c21abf2592463))
+
+
+### 📚　Documentation
+
+* **fake-timer:** 重構文件架構並完善 API 說明文件 ([25bd9e2](https://github.com/bluelovers/ws-timer/commit/25bd9e2c3c0d419452e1d3e7bf5a84a8ee284c37))
+* **fake-timer:** 新增使用說明文件與範例程式碼 ([6cba653](https://github.com/bluelovers/ws-timer/commit/6cba6533561fb846f39d98254c856b65285c5b4e))
+
+
+### 🛠　Build System
+
+* **fake-timer:** 更新編譯產物以反映屬性更名變更 ([80b85c6](https://github.com/bluelovers/ws-timer/commit/80b85c6a4ea156d2449fb8cf852a12c36550201f))
+* **fake-timer:** 更新編譯產物以反映執行狀態管理實作 ([fd7fb42](https://github.com/bluelovers/ws-timer/commit/fd7fb42186c93022ac0eae1ce47b3c10077fad67))
+
+
+
 ## [2.0.2](https://github.com/bluelovers/ws-timer/compare/fake-timer@2.0.1...fake-timer@2.0.2) (2026-09-26)
 
 
