@@ -26,7 +26,7 @@ const clock = getUnsafeGlobalFakeTimer();   // 懶惰單例 / lazy singleton
 
 clock.installGlobalClock();                 // 替換全域 Date.now / performance.now
 clock.advance(1000);
-console.log(Date.now());                    // 反映虛擬時間 / reflects fake time
+console.log(Date.now());                    // 反映虛擬時間 / reflects virtual time
 
 clock.uninstallGlobalClock();               // 還原原始實作 / restore originals
 
@@ -43,8 +43,8 @@ console.log(clock.globalClockState());
 ## 2. 進階取值 / Advanced accessors
 
 - `initTime: dayjs.Dayjs`（getter）
-  虛擬時鐘的初始時間（t=0 基準）。等於 `timer.data.fake_init`，但為**公開**取值，不必操作底層 `data`。
-  Public accessor for the initial virtual clock; equals `timer.data.fake_init` without reaching into internals.
+  虛擬時鐘的初始時間（t=0 基準）。等於 `timer.data.virtual_init`，但為**公開**取值，不必操作底層 `data`。
+  Public accessor for the initial virtual clock; equals `timer.data.virtual_init` without reaching into internals.
   - 用途 / Use：`timer.now().diff(self.initTime)` 取得「自建立以來經過的毫秒數」。
 
 - `frameInterval: dayjs.Duration`
@@ -85,7 +85,7 @@ if (item.type === EnumTimerType.setInterval)
 
 | 方法 / Method | 說明 / Description |
 | --- | --- |
-| `pause()` | 暫停進行中的 run，並將虛擬時間修正為下一個待執行項目的觸發時間 / pause the in-progress run and correct virtual time to the next pending item's timing |
+| `pause()` | 暫停進行中的 run，並將虛擬時間修正為下一個待執行項目的觸發時間 / pause the in-progress run and correct virtual time to the next pending item's virtualTiming |
 | `cancel()` | 取消進行中的 run，並將虛擬時間修正回本次 run 開始前的值 / cancel the in-progress run and correct virtual time back to the pre-run value |
 
 - 兩者只在 `run` / `start` / `runAsync` / `startAsync` 執行回呼期間有意義；其餘時間為 no-op。

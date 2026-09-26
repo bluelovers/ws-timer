@@ -163,12 +163,12 @@ describe('issue: sync vs async API surface', () =>
 
 			t.setInterval((item) =>
 			{
-				fired.push(t.timer.now().diff(item.timing));
+				fired.push(t.timer.now().diff(item.virtualTiming));
 			}, 1000);
 
 			// Each step must complete before the next, otherwise concurrent runs
-			// race on the shared fake_now clock (same as the native single clock).
-			// 每個步驟必須依序完成，否則並行的 run 會競爭共享的 fake_now 時鐘
+			// race on the shared virtual_now clock (same as the native single clock).
+			// 每個步驟必須依序完成，否則並行的 run 會競爭共享的 virtual_now 時鐘
 			//（與原生單一時鐘相同）。
 			const step = () => useAsync ? t.startAsync(1000) : t.start(1000);
 			await step();

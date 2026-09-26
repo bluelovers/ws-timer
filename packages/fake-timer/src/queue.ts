@@ -12,7 +12,7 @@ import type { FakeTimer } from './index';
 dayjs.extend(duration);
 dayjs.extend(minMax);
 
-/** 虛擬時間或時間區間的聯合型別 / Union type for fake time or time duration */
+/** 虛擬時間或時間區間的聯合型別 / Union type for virtual time or time duration */
 export type IDayMoment = dayjs.Dayjs | duration.Duration;
 
 /**
@@ -74,19 +74,19 @@ export interface ITimeQueueItem
 	id?: number;
 
 	/** 預計觸發時間（絕對虛擬時間）；觸發時等於 now() / Scheduled trigger time (absolute virtual time); equals now() at fire */
-	timing?: dayjs.Dayjs;
+	virtualTiming?: dayjs.Dayjs;
 
-	/** 註冊時間（排程當下的虛擬時間）；`now().diff(added)` 即原始 delay / Registration time (virtual time when scheduled); `now().diff(added)` gives the original delay */
-	added?: dayjs.Dayjs;
+	/** 註冊時間（排程當下的虛擬時間）；`now().diff(virtualAdded)` 即原始 delay / Registration time (virtual time when scheduled); `now().diff(virtualAdded)` gives the original delay */
+	virtualAdded?: dayjs.Dayjs;
 
 	/** 已觸發次數（每次執行回呼 +1；一次性 timer 固定為 1）；週期性 setInterval 可讀它判斷第幾次 / Fire count (incremented per callback; 1 for one-shot); setInterval reads it for the Nth fire */
 	count?: number;
 
 	/** 實際「開始」執行的時間；注意是**真實牆鐘**（dayjs()），非虛擬時間 / Actual execution START time — note: REAL wall-clock (dayjs()), not virtual time */
-	active?: dayjs.Dayjs;
+	realActive?: dayjs.Dayjs;
 
-	/** 執行「結束」時間（回呼返回後才寫入）；同為**真實牆鐘**；`ending.diff(active)` 即回呼真實耗時 / Execution END time (written after the callback returns); also REAL wall-clock; `ending.diff(active)` is the real callback duration */
-	ending?: dayjs.Dayjs;
+	/** 執行「結束」時間（回呼返回後才寫入）；同為**真實牆鐘**；`realEnding.diff(realActive)` 即回呼真實耗時 / Execution END time (written after the callback returns); also REAL wall-clock; `realEnding.diff(realActive)` is the real callback duration */
+	realEnding?: dayjs.Dayjs;
 
 	/** 隨機唯一識別碼（nanoid 字串）；可作為 clear* / remove 的 ITimerHandle / Random unique id (nanoid string); usable as an ITimerHandle */
 	name?: string;
@@ -117,7 +117,7 @@ export interface ITimeQueueItem
 export interface ITimeQueueItemAdd extends ITimeQueueItem
 {
 	/** 可為 Dayjs 或 Duration（Duration 會在加入時轉換為絕對時間）/ Can be Dayjs or Duration (Duration is converted to absolute time when added) */
-	timing?: IDayMoment | number | any;
+	virtualTiming?: IDayMoment | number | any;
 }
 
 /**
@@ -153,8 +153,8 @@ export interface ISetTimeout extends Function
  * 計時器回呼函式介面
  * Timer callback function interface
  *
- * @param current - 當前執行的佇列項目 / The currently executing queue item
- * @param timer - 所屬的 QueueTimer 實例 / The owning QueueTimer instance
+ * @param current - 當前執行的佇列項目（同時是回呼內的 `this`）/ The currently executing queue item (also `this` inside the callback)
+ * @param self - 所屬的 FakeTimer 實例 / The owning FakeTimer instance
  */
 export interface ICallback extends Function
 {
@@ -195,7 +195,7 @@ export class QueueTimer extends TimeCore
 		max: null,
 	} as any;
 
-	/** 內部狀態（real_init / fake_init / fake_now / fake_old 等）；避免直接操作，請用 FakeTimer 公開 API；見 docs/README.md §8 / Internal state (real_init / fake_init / fake_now / fake_old etc.); avoid direct access (see docs/README.md §8) */
+	/** 內部狀態（real_init / virtual_init / virtual_now / virtual_old 等）；避免直接操作，請用 FakeTimer 公開 API；見 docs/README.md §8 / Internal state (real_init / virtual_init / virtual_now / virtual_old etc.); avoid direct access (see docs/README.md §8) */
 	public override data: ITimeData;
 
 	constructor()
@@ -206,7 +206,7 @@ export class QueueTimer extends TimeCore
 	}
 
 	/**
-	 * 佇列中项目的數量 / Number of items in the queue
+	 * 佇列中項目的數量 / Number of items in the queue
 	 */
 	get length()
 	{
@@ -222,7 +222,7 @@ export class QueueTimer extends TimeCore
 	 * 2. 若 timing 為 Duration，轉換為絕對時間（now + duration）
 	 * 3. 產生唯一 id 與 name，推入佇列
 	 * Processing flow:
-	 * 1. If timing not specified, use current fake time
+	 * 1. If timing not specified, use current virtual time
 	 * 2. If timing is Duration, convert to absolute time (now + duration)
 	 * 3. Generate unique id and name, push to queue
 	 *
@@ -235,10 +235,10 @@ export class QueueTimer extends TimeCore
 	 */
 	add = (q: ITimeQueueItemAdd): ITimeQueueItem =>
 	{
-		/** 若未指定觸發時間，使用當前虛擬時間 / If no trigger time specified, use current fake time */
+		/** 若未指定觸發時間，使用當前虛擬時間 / If no trigger time specified, use current virtual time */
 		const now = this.now();
 
-		q.timing = q.timing || now;
+		q.virtualTiming = q.virtualTiming || now;
 
 		/**
 		 * 合併預設值與實際值，產生唯一識別碼
@@ -247,18 +247,18 @@ export class QueueTimer extends TimeCore
 		q = Object.assign({
 			id: null,
 			name: null,
-			timing: null,
+			virtualTiming: null,
 		}, q, {
 			id: this.id(),
 			name: nanoid(),
-			timing: dayjs.isDuration(q.timing) ? now.add(q.timing) : q.timing,
-			added: now,
+			virtualTiming: dayjs.isDuration(q.virtualTiming) ? now.add(q.virtualTiming) : q.virtualTiming,
+			virtualAdded: now,
 			count: 0,
 			index: this.length,
 		});
 
 		/** 更新快取中的時間邊界 / Update time boundaries in cache */
-		this._cache_timing(q.timing);
+		this._cache_timing(q.virtualTiming);
 
 		this.queue.push(q as ITimeQueueItem);
 
@@ -274,8 +274,8 @@ export class QueueTimer extends TimeCore
 	 */
 	_cache_refresh = (): void =>
 	{
-		this.cache.min = this.length ? this.eq(0).timing : null;
-		this.cache.max = this.length ? this.eq(-1).timing : null;
+		this.cache.min = this.length ? this.eq(0).virtualTiming : null;
+		this.cache.max = this.length ? this.eq(-1).virtualTiming : null;
 	};
 
 	/**
@@ -322,7 +322,7 @@ export class QueueTimer extends TimeCore
 		{
 			q.index = index;
 
-			self._cache_timing(q.timing);
+			self._cache_timing(q.virtualTiming);
 		});
 
 		return this;
@@ -436,7 +436,7 @@ export class QueueTimer extends TimeCore
 	 *
 	 * 判斷邏輯：比較當前虛擬時間與佇列中最早的時間（cache.min）
 	 * 若差值 >= 0 則表示至少有一個項目已到期
-	 * Logic: compare current fake time with the earliest time in queue (cache.min)
+	 * Logic: compare current virtual time with the earliest time in queue (cache.min)
 	 * If diff >= 0, at least one item has expired
 	 *
 	 * 內部用途 / Internal use：公開判斷是否還有到期項目請直接呼叫 FakeTimer 的 start / run 觸發。
@@ -454,7 +454,7 @@ export class QueueTimer extends TimeCore
 	 * Clear the entire queue (removes all timer items)
 	 *
 	 * 不影響虛擬時間（時鐘保持不變）。
-	 * Does not affect fake time (the clock stays unchanged).
+	 * Does not affect virtual time (the clock stays unchanged).
 	 *
 	 * 內部實作 / Internal implementation：公開請改用 FakeTimer.clearAll()。
 	 * Internal: prefer FakeTimer.clearAll().
@@ -484,7 +484,7 @@ export default QueueTimer;
  */
 export function queueSortCallback(a: ITimeQueueItem, b: ITimeQueueItem)
 {
-	let d = a.timing.diff(b.timing);
+	let d = a.virtualTiming.diff(b.virtualTiming);
 
 	//console.log(d, a.id, b.id);
 
@@ -493,7 +493,7 @@ export function queueSortCallback(a: ITimeQueueItem, b: ITimeQueueItem)
 		return a.id > b.id;
 	}
 
-	return a.timing.diff(b.timing);
+	return a.virtualTiming.diff(b.virtualTiming);
 }
 
 /**
@@ -507,7 +507,7 @@ export function queueSortCallback(a: ITimeQueueItem, b: ITimeQueueItem)
  */
 export function queueSortCallback2(a: ITimeQueueItem, b: ITimeQueueItem)
 {
-	let d = a.timing.diff(b.timing);
+	let d = a.virtualTiming.diff(b.virtualTiming);
 
 	//console.log(d, a.id, b.id);
 
@@ -516,5 +516,5 @@ export function queueSortCallback2(a: ITimeQueueItem, b: ITimeQueueItem)
 		return a.id < b.id;
 	}
 
-	return a.timing.diff(b.timing);
+	return a.virtualTiming.diff(b.virtualTiming);
 }

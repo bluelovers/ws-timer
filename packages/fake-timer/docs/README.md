@@ -78,7 +78,7 @@ setTimeout((current, self, ...rest) => {
   // self   ：所屬的 FakeTimer 實例
   // rest   ：呼叫 setTimeout(func, delay, ...args) 時傳入的額外引數
   self.timer.now();        // 虛擬時鐘（dayjs）
-  current.timing;          // 這個計時器的排程時間（dayjs）
+  current.virtualTiming;          // 這個計時器的排程時間（dayjs）
 }, 1000, 'a', 'b');        // ← 'a', 'b' 會在觸發時轉交給 rest
 ```
 
@@ -86,9 +86,9 @@ setTimeout((current, self, ...rest) => {
 - 回呼內的 `this` **不是** FakeTimer，而是 `current` 佇列項目本身；請用 `self` 取得 FakeTimer，不要依賴 `this`。
 - 第 3 個起的 `...params` 來自 `setTimeout(func, delay, ...args)`，觸發時原樣轉交（對齊 Web/API/Window.setTimeout）；
   `setInterval` 每次重排都沿用同一組 `params`。
-- `current.added` 是**註冊時間**（排程當下的虛擬時間）；`current.timing` 是預計觸發時間（絕對虛擬時間）。
-- 想算「從起始時間到觸發過了多久（虛擬）」：`self.timer.now().diff(self.initTime)`（觸發時 `now()` 即 `current.timing`，差值 = delay）。
-  - `self.initTime` 是公開取值 API，等於 `self.timer.data.fake_init`；一般場景請用 `initTime`，不必操作底層 `data`。
+- `current.virtualAdded` 是**註冊時間**（排程當下的虛擬時間）；`current.virtualTiming` 是預計觸發時間（絕對虛擬時間）。
+- 想算「從起始時間到觸發過了多久（虛擬）」：`self.timer.now().diff(self.initTime)`（觸發時 `now()` 即 `current.virtualTiming`，差值 = delay）。
+  - `self.initTime` 是公開取值 API，等於 `self.timer.data.virtual_init`；一般場景請用 `initTime`，不必操作底層 `data`。
   - 例：`setTimeout(cb, 250)` 觸發時 `elapsed = 250`；`setImmediate(cb)` 觸發時 `elapsed = 0`。
 - `current.count` 是**已觸發次數**（每次執行回呼 +1；一次性 timer 固定為 `1`）。週期性 `setInterval` 可讀它判斷目前是第幾次觸發。
   - 例：`setInterval(cb, 50)` 連續觸發時，回呼內 `current.count` 依次為 `1, 2, 3, …`。
@@ -110,7 +110,7 @@ setTimeout(func, delay, param1, /* …, */ paramN);
 ### 2.3 delay 的限制 / delay constraints
 
 - `delay` 省略時預設為 `0`（立即排入，對齊標準 `setTimeout(func)`）。
-- `Infinity` / `-Infinity` / `NaN` 會**直接拋 `RangeError`**：這類「無限 delay」既不會觸發、又會讓佇列裡出現 `NaN` timing（污染排序），屬不可控誤用，因此改為早期失敗（fail fast）。
+- `Infinity` / `-Infinity` / `NaN` 會**直接拋 `RangeError`**：這類「無限 delay」既不會觸發、又會讓佇列裡出現 `NaN` virtualTiming（污染排序），屬不可控誤用，因此改為早期失敗（fail fast）。
 - 無效 `dayjs.Duration` 也會**拋 `RangeError`**：`dayjs.duration(NaN)`（會當場誤觸發）與 `dayjs.duration(Infinity)`（永不觸發）皆解析為非有限毫秒，同屬失控誤用。有效 Duration 為解析後毫秒數有限者。
 - **負數 delay 不拋錯**，對齊標準 Web API：timeout `< 0` 視為 `0`（立即觸發）。數值與 `dayjs.Duration` 負數皆箝成 `0`。
 
@@ -124,7 +124,7 @@ setTimeout(func, delay, param1, /* …, */ paramN);
 
 ### 4.1 回呼讀到的是「最終時間」，不是「排程邊界」
 
-`start(350)` 會先把虛擬時鐘一口氣推到 350，再執行所有 `timing <= 350` 的回呼。
+`start(350)` 會先把虛擬時鐘一口氣推到 350，再執行所有 `virtualTiming <= 350` 的回呼。
 因此回呼內讀到的時鐘一律是 **350**，而不是各自原定的 100 / 200 / 300。
 
 ```ts
@@ -149,7 +149,7 @@ console.log(seen); // => [350, 350, 350]   （不是 [100, 200, 300]）
 
 ### 4.3 週期計時器會自動 catch-up
 
-`setInterval(cb, 100)` 每次觸發後以 `timing + interval` 重排；一次 `start()` 跨越多個週期邊界時，
+`setInterval(cb, 100)` 每次觸發後以 `virtualTiming + interval` 重排；一次 `start()` 跨越多個週期邊界時，
 會在同一輪 run 內依序補償觸發（不會漂移）。每個回呼讀到的仍是**最終時間**。
 
 > 範例：`test/demo/03-interval-catchup.ts`
@@ -196,7 +196,7 @@ t.start(-1); // 跳到 1500 並執行
 ## 7. 正確讀取虛擬時鐘
 
 - `timer.now()` 回傳 `dayjs.Dayjs`，**不是**數字。
-- 取得「自建立以來經過的毫秒數」：`timer.now().diff(timer.data.fake_init)`。
+- 取得「自建立以來經過的毫秒數」：`timer.now().diff(timer.data.virtual_init)`。
 - 也可自己抓基準：`const base = timer.now();` 之後 `timer.now().diff(base)`。
 
 **不要**直接呼叫 `timer.update(...)` 來移動時鐘。那是 `advance()` 內部才使用的內部方法

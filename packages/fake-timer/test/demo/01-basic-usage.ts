@@ -32,20 +32,20 @@ t.setInterval(() => { bFired = true; }, 500);    // 每 500ms / every 500ms
 
 // 此時時鐘仍在 0，回呼尚未執行
 // clock is still at 0, nothing has run yet
-check('排程後時鐘仍為 0 / clock stays 0 before start', t.timer.now().diff(t.timer.data.fake_init) === 0);
+check('排程後時鐘仍為 0 / clock stays 0 before start', t.timer.now().diff(t.timer.data.virtual_init) === 0);
 check('回呼尚未執行 / callbacks not fired yet', !aFired && !bFired);
 
 // advance() 只移動時鐘，不執行回呼
 // advance() moves time only, does not run callbacks
 t.advance(1000);
 check('advance(1000) 後 a 仍沒執行 / a not fired after advance only', !aFired);
-check('advance(1000) 後時鐘為 1000 / clock = 1000', t.timer.now().diff(t.timer.data.fake_init) === 1000);
+check('advance(1000) 後時鐘為 1000 / clock = 1000', t.timer.now().diff(t.timer.data.virtual_init) === 1000);
 
 // run() 執行到期回呼，時鐘不變
 // run() executes due callbacks, clock unchanged
 t.run();
 check('run() 後 a 已執行 / a fired after run', aFired);
-check('run() 後時鐘仍為 1000 / clock still 1000', t.timer.now().diff(t.timer.data.fake_init) === 1000);
+check('run() 後時鐘仍為 1000 / clock still 1000', t.timer.now().diff(t.timer.data.virtual_init) === 1000);
 
 // start(ms) = advance(ms) + run()，一次完成
 // start(ms) does both in one call
@@ -54,6 +54,6 @@ let cFired = false;
 t2.setTimeout(() => { cFired = true; }, 250);
 t2.start(250);
 check('start(250) 後 c 已執行 / c fired after start', cFired);
-check('start(250) 後時鐘為 250 / clock = 250', t2.timer.now().diff(t2.timer.data.fake_init) === 250);
+check('start(250) 後時鐘為 250 / clock = 250', t2.timer.now().diff(t2.timer.data.virtual_init) === 250);
 
 console.log('\n— Demo 01 完成 / Demo 01 done —');

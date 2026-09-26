@@ -41,16 +41,16 @@ console.log('— A. 正常逐格前進 / normal stepping —');
 {
 	const t = new FakeTimer();
 	const seen: number[] = [];
-	t.setTimeout(() => seen.push(t.timer.now().diff(t.timer.data.fake_init)), 500);
-	t.setTimeout(() => seen.push(t.timer.now().diff(t.timer.data.fake_init)), 1500);
+	t.setTimeout(() => seen.push(t.timer.now().diff(t.timer.data.virtual_init)), 500);
+	t.setTimeout(() => seen.push(t.timer.now().diff(t.timer.data.virtual_init)), 1500);
 
 	t.start(-1); // 跳到 500 並執行 / jump to 500 and run
 	check('第一次 start(-1) 後 seen=[500]', JSON.stringify(seen) === JSON.stringify([500]));
-	check('時鐘停在 500 / clock at 500', t.timer.now().diff(t.timer.data.fake_init) === 500);
+	check('時鐘停在 500 / clock at 500', t.timer.now().diff(t.timer.data.virtual_init) === 500);
 
 	t.start(-1); // 跳到 1500 並執行 / jump to 1500 and run
 	check('第二次 start(-1) 後 seen=[500,1500]', JSON.stringify(seen) === JSON.stringify([500, 1500]));
-	check('時鐘停在 1500 / clock at 1500', t.timer.now().diff(t.timer.data.fake_init) === 1500);
+	check('時鐘停在 1500 / clock at 1500', t.timer.now().diff(t.timer.data.virtual_init) === 1500);
 }
 
 // ---- B. 陷阱：取消最早計時器後，start(-1) 跳到失效的 cache.min ----
@@ -64,7 +64,7 @@ console.log('\n— B. 陷阱：取消後 start(-1) 跳到失效快取 / pitfall 
 	// 先把時鐘推到 1000（a 已到期但未 run；b 還沒到期）
 	// advance clock to 1000 (a is due but not run yet; b not due)
 	t.advance(1000);
-	const before = t.timer.now().diff(t.timer.data.fake_init);
+	const before = t.timer.now().diff(t.timer.data.virtual_init);
 
 	// 取消最早的 a；cache.min 並未因此刷新，仍記得 500
 	// cancel the earliest (a); cache.min is NOT refreshed, still remembers 500
@@ -72,7 +72,7 @@ console.log('\n— B. 陷阱：取消後 start(-1) 跳到失效快取 / pitfall 
 
 	t.start(-1); // 期望：跳到 1500 執行 b。實際：跳到失效的 500，b 不會執行
 	// expectation: jump to 1500 and run b. reality: jumps to stale 500, b never runs
-	const after = t.timer.now().diff(t.timer.data.fake_init);
+	const after = t.timer.now().diff(t.timer.data.virtual_init);
 
 	console.log(`   取消 a 前時鐘=${before}，start(-1) 後時鐘=${after}，seen=${JSON.stringify(seen)}`);
 	check('start(-1) 把時鐘從 1000 跳回 500（往回跳！）/ clock jumped BACKWARD 1000→500', after === 500);
@@ -94,7 +94,7 @@ console.log('\n— C. 安全做法：先 timer.sort() 再 start(-1) / safe: sort
 	t.start(-1);        // 這次正確跳到 1500 並執行 b
 
 	check('sort() 後 start(-1) 正確執行 b / after sort(), start(-1) correctly runs b', JSON.stringify(seen) === JSON.stringify(['b']));
-	check('時鐘停在 1500 / clock at 1500', t.timer.now().diff(t.timer.data.fake_init) === 1500);
+	check('時鐘停在 1500 / clock at 1500', t.timer.now().diff(t.timer.data.virtual_init) === 1500);
 }
 
 console.log('\n— Demo 04 完成 / Demo 04 done —');

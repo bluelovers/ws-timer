@@ -46,7 +46,7 @@ file it states its **intent** (what it demonstrates or verifies) and its **respo
 | `test/issues/run-array-shift.node-test.ts` | 迴歸：`run()` 迭代中移除項目不得跳過（`for...in` + `splice` 位移 bug）。 | 迭代安全迴歸，守護「不漏執行到期項目」。 |
 | `test/issues/extra-api.node-test.ts` | 迴歸：`clearAll` / `reset` / `requestAnimationFrame` / 全域時鐘 等延伸 API。 | 守護基礎 `set*` / `clear*` 之上的延伸 API 表面。 |
 | `test/issues/clear-timeout-api.node-test.ts` | 迴歸：`clearTimeout` / `clearInterval` / `clearImmediate` 通用 `ITimerHandle`。 | 守護取消 API 語意（item / name / index 皆可用）。 |
-| `test/issues/start-empty-queue.node-test.ts` | 迴歸：空佇列上 `start(-1)` 不得破壞 `fake_now`。 | 邊界防禦，守護「空佇列」的 `-1` 跳轉語意。 |
+| `test/issues/start-empty-queue.node-test.ts` | 迴歸：空佇列上 `start(-1)` 不得破壞 `virtual_now`。 | 邊界防禦，守護「空佇列」的 `-1` 跳轉語意。 |
 | `test/issues/set-interval-repeat.node-test.ts` | 迴歸：`setInterval` 必須真正週期重複（不再等同 `setTimeout`）。 | 守護 interval 重複語意與 `clearInterval` 停止能力。 |
 | `test/issues/sync-async-api.node-test.ts` | 迴歸：`set*` 真正同步、`runAsync` / `startAsync` `await` 回呼、共用 `_runCore`。 | 守護同步 / 非同步介面契約與單一實作來源。 |
 

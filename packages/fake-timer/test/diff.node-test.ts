@@ -6,9 +6,9 @@
  *
  * 涵蓋的 diff( 使用位置 / Covered diff( usages:
  *   - queue.ts  hasExpires()            : now().diff(cache.min)
- *   - queue.ts  queueSortCallback       : a.timing.diff(b.timing)
- *   - queue.ts  queueSortCallback2      : a.timing.diff(b.timing)
- *   - index.ts run()                    : now.diff(current.timing)
+ *   - queue.ts  queueSortCallback       : a.virtualTiming.diff(b.virtualTiming)
+ *   - queue.ts  queueSortCallback2      : a.virtualTiming.diff(b.virtualTiming)
+ *   - index.ts run()                    : now.diff(current.virtualTiming)
  *
  * Usage: tsx --test test/diff.node-test.ts
  */
@@ -28,12 +28,12 @@ import { ITimeQueueItem } from '../src/queue';
  * 建立一個帶有 timing 與 id 的佇列項目
  * Build a queue item with timing and id
  */
-function makeItem(timing: dayjs.Dayjs, id: number): ITimeQueueItem
+function makeItem(virtualTiming: dayjs.Dayjs, id: number): ITimeQueueItem
 {
 	return {
 		id,
 		name: `item-${id}`,
-		timing,
+		virtualTiming,
 		callback: () => {},
 	};
 }
@@ -46,7 +46,7 @@ describe('diff() usage: hasExpires()', () =>
 
 		// 加入一個已經過期的項目（timing 早於 now）
 		// Add an already-expired item (timing earlier than now)
-		q.add({ callback: () => {}, timing: q.now().add(-1000) });
+		q.add({ callback: () => {}, virtualTiming: q.now().add(-1000) });
 		q.sort();
 
 		// now().diff(cache.min) >= 0 → 已到期
@@ -61,7 +61,7 @@ describe('diff() usage: hasExpires()', () =>
 
 		// 加入一個未來才會觸發的項目
 		// Add an item that triggers in the future
-		q.add({ callback: () => {}, timing: q.now().add(99999) });
+		q.add({ callback: () => {}, virtualTiming: q.now().add(99999) });
 		q.sort();
 
 		// now().diff(cache.min) < 0 → 尚未到期
@@ -77,7 +77,7 @@ describe('diff() usage: hasExpires()', () =>
 		// timing 與 now() 完全相同
 		// timing exactly equals now()
 		const now = q.now();
-		q.add({ callback: () => {}, timing: now });
+		q.add({ callback: () => {}, virtualTiming: now });
 		q.sort();
 
 		// diff == 0 仍視為到期（>= 0）
@@ -90,7 +90,7 @@ describe('diff() usage: hasExpires()', () =>
 	{
 		const q = QueueTimer.new();
 
-		q.add({ callback: () => {}, timing: q.now().add(5000) });
+		q.add({ callback: () => {}, virtualTiming: q.now().add(5000) });
 		q.sort();
 		assert.equal(q.hasExpires(), false);
 
@@ -113,7 +113,7 @@ describe('diff() usage: queueSortCallback()', () =>
 
 		// timing 相同 → diff == 0
 		// same timing → diff == 0
-		assert.equal(a.timing.diff(b.timing), 0);
+		assert.equal(a.virtualTiming.diff(b.virtualTiming), 0);
 
 		// a.id(5) > b.id(3) → a 排在前面（返回 true）
 		// a.id(5) > b.id(3) → a comes first (returns true)
@@ -132,9 +132,9 @@ describe('diff() usage: queueSortCallback()', () =>
 		const a = makeItem(t1, 1); // 較早 / earlier
 		const b = makeItem(t2, 2); // 較晚 / later
 
-		// a.timing < b.timing → diff 為負數 → a 排前面
-		// a.timing < b.timing → negative diff → a comes first
-		const d = a.timing.diff(b.timing);
+		// a.virtualTiming < b.virtualTiming → diff 為負數 → a 排前面
+		// a.virtualTiming < b.virtualTiming → negative diff → a comes first
+		const d = a.virtualTiming.diff(b.virtualTiming);
 		assert.ok(d < 0);
 
 		// queueSortCallback 回傳 diff 值本身（負數 < 0 → 升冪排序）
@@ -143,7 +143,7 @@ describe('diff() usage: queueSortCallback()', () =>
 		assert.ok(queueSortCallback(a, b) < 0);
 	});
 
-	it('should return positive diff when a.timing is later than b.timing', () =>
+	it('should return positive diff when a.virtualTiming is later than b.virtualTiming', () =>
 	{
 		const t1 = dayjs();
 		const t2 = t1.add(1000);
@@ -151,7 +151,7 @@ describe('diff() usage: queueSortCallback()', () =>
 		const a = makeItem(t2, 1); // 較晚 / later
 		const b = makeItem(t1, 2); // 較早 / earlier
 
-		const d = a.timing.diff(b.timing);
+		const d = a.virtualTiming.diff(b.virtualTiming);
 		assert.ok(d > 0);
 
 		assert.equal(queueSortCallback(a, b), d);
@@ -169,7 +169,7 @@ describe('diff() usage: queueSortCallback2()', () =>
 
 		// timing 相同 → diff == 0
 		// same timing → diff == 0
-		assert.equal(a.timing.diff(b.timing), 0);
+		assert.equal(a.virtualTiming.diff(b.virtualTiming), 0);
 
 		// a.id(3) < b.id(5) → a 排在前面（返回 true）
 		// a.id(3) < b.id(5) → a comes first (returns true)
@@ -212,11 +212,11 @@ describe('diff() usage: run() expiry gate', () =>
 
 		await t.run();
 
-		// run() 內部用 now.diff(current.timing) >= 0 決定是否執行
-		// run() uses now.diff(current.timing) >= 0 internally to decide execution
+		// run() 內部用 now.diff(current.virtualTiming) >= 0 決定是否執行
+		// run() uses now.diff(current.virtualTiming) >= 0 internally to decide execution
 		assert.equal(called, true);
 		assert.equal(t.cache.done.length, 1);
-		assert.equal(t.timer.now().diff(t.cache.done[0].timing) >= 0, true);
+		assert.equal(t.timer.now().diff(t.cache.done[0].virtualTiming) >= 0, true);
 	});
 
 	it('should skip callback when now.diff(timing) < 0 (future)', async () =>
@@ -231,7 +231,7 @@ describe('diff() usage: run() expiry gate', () =>
 
 		// 尚未推進時間 → now.diff(timing) < 0 → 不應執行
 		// Time not advanced → now.diff(timing) < 0 → should not execute
-		assert.equal(t.timer.now().diff(item.timing) < 0, true);
+		assert.equal(t.timer.now().diff(item.virtualTiming) < 0, true);
 
 		await t.run();
 

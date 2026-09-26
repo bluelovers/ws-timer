@@ -9,7 +9,7 @@ dayjs.extend(duration);
 
 /**
  * 時間資料介面，儲存真實時間與虛擬時間的狀態
- * Time data interface, stores real time and fake time state
+ * Time data interface, stores real time and virtual time state
  */
 export interface ITimeDataCore
 {
@@ -19,28 +19,28 @@ export interface ITimeDataCore
 	/** 真實世界初始時間（建立 Time 實例時的實際時間） / Real-world initial time (actual time when Time instance was created) */
 	real_init?: dayjs.Dayjs;
 
-	/** 虛擬時間初始值 / Fake time initial value */
-	fake_init?: dayjs.Dayjs;
+	/** 虛擬時間初始值 / Virtual time initial value */
+	virtual_init?: dayjs.Dayjs;
 
-	/** 虛擬時間當前值（隨 update 推進） / Fake time current value (advanced via update) */
-	fake_now?: dayjs.Dayjs;
+	/** 虛擬時間當前值（隨 update 推進） / Virtual time current value (advanced via update) */
+	virtual_now?: dayjs.Dayjs;
 
-	/** 上一次 update 前的虛擬時間（用於回溯或差值計算） / Fake time before last update (used for rollback or diff calculation) */
-	fake_old?: dayjs.Dayjs;
+	/** 上一次 update 前的虛擬時間（用於回溯或差值計算） / Virtual time before last update (used for rollback or diff calculation) */
+	virtual_old?: dayjs.Dayjs;
 }
 
 /**
  * 時間基礎類別，提供可控的虛擬時間環境
- * Base time class providing a controllable fake time environment
+ * Base time class providing a controllable virtual time environment
  *
  * 此類別是整個 fake-timer 的核心，管理真實時間與虛擬時間的映射。
  * 透過 update() 方法可任意推進虛擬時間，用於測試或模擬計時器行為。
- * This class is the core of the fake-timer, managing the mapping between real time and fake time.
+ * This class is the core of the fake-timer, managing the mapping between real time and virtual time.
  * The virtual time can be advanced arbitrarily via update() for testing or simulating timer behavior.
  */
 export class TimeCore
 {
-	/** 時間狀態資料（內部）；含 real_init / fake_init / fake_now / fake_old 等；避免直接操作，請用 FakeTimer 公開 API。 / Time state data (internal): real_init / fake_init / fake_now / fake_old etc.; avoid direct access — use FakeTimer's public API. */
+	/** 時間狀態資料（內部）；含 real_init / virtual_init / virtual_now / virtual_old 等；避免直接操作，請用 FakeTimer 公開 API。 / Time state data (internal): real_init / virtual_init / virtual_now / virtual_old etc.; avoid direct access — use FakeTimer's public API. */
 	public data = {} as ITimeDataCore;
 
 	/**
@@ -71,8 +71,8 @@ export class TimeCore
 		this.data = Object.assign(this.data, {
 			id: 0,
 			real_init: dayjs(),
-			fake_init: now,
-			fake_now: now,
+			virtual_init: now,
+			virtual_now: now,
 		}, options);
 
 		this._init();
@@ -138,10 +138,10 @@ export class TimeCore
 
 	/**
 	 * 推進虛擬時間
-	 * Advance the fake time
+	 * Advance the virtual time
 	 *
-	 * 根據不同型別的參數推進 fake_now：
-	 * Advances fake_now based on different parameter types:
+	 * 根據不同型別的參數推進 virtual_now：
+	 * Advances virtual_now based on different parameter types:
 	 * - Duration 物件 → 直接加算 / Duration object → add directly
 	 * - 物件（Date 等）→ 直接設定為該時間 / Object (Date etc.) → set to that time
 	 * - 數字 + unit → 加算指定單位 / Number + unit → add specified unit
@@ -154,24 +154,24 @@ export class TimeCore
 	 */
 	update(amount: any = 100, unit?: dayjs.ManipulateType)
 	{
-		/** 記錄更新前的虛擬時間 / Record fake time before update */
-		this.data.fake_old = this.data.fake_now as dayjs.Dayjs;
+		/** 記錄更新前的虛擬時間 / Record virtual time before update */
+		this.data.virtual_old = this.data.virtual_now as dayjs.Dayjs;
 
 		if (dayjs.isDuration(amount))
 		{
-			this.data.fake_now = (this.data.fake_now as dayjs.Dayjs).add(amount);
+			this.data.virtual_now = (this.data.virtual_now as dayjs.Dayjs).add(amount);
 		}
 		else if (typeof amount == 'object')
 		{
-			this.data.fake_now = dayjs(amount);
+			this.data.virtual_now = dayjs(amount);
 		}
 		else if (unit || typeof amount == 'number')
 		{
-			this.data.fake_now = (this.data.fake_now as dayjs.Dayjs).add(amount, unit);
+			this.data.virtual_now = (this.data.virtual_now as dayjs.Dayjs).add(amount, unit);
 		}
 		else
 		{
-			this.data.fake_now = (this.data.fake_now as dayjs.Dayjs).add(100);
+			this.data.virtual_now = (this.data.virtual_now as dayjs.Dayjs).add(100);
 		}
 
 		return this;
@@ -196,18 +196,18 @@ export class TimeCore
 	 * Get the current virtual time (dayjs.Dayjs, NOT a number).
 	 *
 	 * 這是 FakeTimer 回呼內 `self.timer.now()` 讀取的時鐘；計算「自建立以來經過的毫秒數」
-	 * 請用 `now().diff(fake_init)`（或 FakeTimer.initTime）。
+	 * 請用 `now().diff(virtual_init)`（或 FakeTimer.initTime）。
 	 * This is the clock read via `self.timer.now()` inside callbacks. To compute elapsed ms
-	 * since creation, use `now().diff(fake_init)` (or FakeTimer.initTime).
+	 * since creation, use `now().diff(virtual_init)` (or FakeTimer.initTime).
 	 */
 	now(): dayjs.Dayjs
 	{
-		return this.data.fake_now as dayjs.Dayjs;
+		return this.data.virtual_now as dayjs.Dayjs;
 	}
 
 	/**
-	 * 將虛擬時間重置回初始值（fake_init），並重設識別碼計數器
-	 * Reset the fake time back to its initial value (fake_init) and reset the id counter
+	 * 將虛擬時間重置回初始值（virtual_init），並重設識別碼計數器
+	 * Reset the virtual time back to its initial value (virtual_init) and reset the id counter
 	 *
 	 * 不影響 real_init（建立實例時捕捉的真實時間）。
 	 * Does not affect real_init (the real time captured at instance creation).
@@ -219,8 +219,8 @@ export class TimeCore
 	 */
 	reset(): this
 	{
-		this.data.fake_now = this.data.fake_init;
-		this.data.fake_old = undefined;
+		this.data.virtual_now = this.data.virtual_init;
+		this.data.virtual_old = undefined;
 		this.data.id = 0;
 
 		return this;

@@ -21,8 +21,8 @@ describe('Time', () =>
 		const t = new TimeCore();
 
 		assert.ok(t.data.real_init.isValid());
-		assert.ok(t.data.fake_init.isValid());
-		assert.ok(t.data.fake_now.isValid());
+		assert.ok(t.data.virtual_init.isValid());
+		assert.ok(t.data.virtual_now.isValid());
 		assert.equal(typeof t.data.id, 'number');
 	});
 
@@ -31,18 +31,18 @@ describe('Time', () =>
 		const customDate = new Date('2020-01-01');
 		const t = new TimeCore(customDate as any);
 
-		assert.ok(t.data.fake_init.isValid());
+		assert.ok(t.data.virtual_init.isValid());
 	});
 
 	it('should handle dayjs objects as immutable', () =>
 	{
 		const t = new TimeCore();
-		const original = t.data.fake_now;
-		const mutated = t.data.fake_now.add(1000);
+		const original = t.data.virtual_now;
+		const mutated = t.data.virtual_now.add(1000);
 
 		// dayjs is immutable: .add() returns new object, original unchanged
 		assert.notEqual(mutated.valueOf(), original.valueOf());
-		assert.equal(t.data.fake_now.valueOf(), original.valueOf());
+		assert.equal(t.data.virtual_now.valueOf(), original.valueOf());
 	});
 
 	it('now() should return immutable reference', () =>
@@ -75,7 +75,7 @@ describe('Time', () =>
 		assert.equal(b, 0);
 	});
 
-	it('update() should advance fake_now by milliseconds', () =>
+	it('update() should advance virtual_now by milliseconds', () =>
 	{
 		const t = new TimeCore();
 		const before = t.now();
@@ -104,8 +104,8 @@ describe('Time', () =>
 
 		t.update(100);
 
-		assert.ok(t.data.fake_old);
-		assert.equal(t.data.fake_old.valueOf(), before.valueOf());
+		assert.ok(t.data.virtual_old);
+		assert.equal(t.data.virtual_old.valueOf(), before.valueOf());
 	});
 
 	it('isValidDate should validate various inputs', () =>
@@ -133,13 +133,13 @@ describe('QueueTimer', () =>
 		const q = QueueTimer.new();
 		const item = q.add({
 			callback: () => {},
-			timing: q.now().add(1000),
+			virtualTiming: q.now().add(1000),
 		});
 
 		assert.equal(typeof item.id, 'number');
 		assert.equal(typeof item.name, 'string');
 		assert.ok(item.name.length > 0);
-		assert.ok(item.timing.isValid());
+		assert.ok(item.virtualTiming.isValid());
 		assert.equal(q.length, 1);
 	});
 
@@ -150,30 +150,30 @@ describe('QueueTimer', () =>
 
 		const item = q.add({
 			callback: () => {},
-			timing: q.now().add(2000),
+			virtualTiming: q.now().add(2000),
 		});
 
-		assert.ok(item.timing.diff(before) >= 2000);
+		assert.ok(item.virtualTiming.diff(before) >= 2000);
 	});
 
 	it('sort() should sort queue by timing', () =>
 	{
 		const q = QueueTimer.new();
 
-		q.add({ callback: () => {}, timing: q.now().add(2000) });
-		q.add({ callback: () => {}, timing: q.now().add(1000) });
+		q.add({ callback: () => {}, virtualTiming: q.now().add(2000) });
+		q.add({ callback: () => {}, virtualTiming: q.now().add(1000) });
 
 		q.sort();
 
-		assert.ok(q.eq(0).timing <= q.eq(1).timing);
+		assert.ok(q.eq(0).virtualTiming <= q.eq(1).virtualTiming);
 	});
 
 	it('eq(-1) should return last item', () =>
 	{
 		const q = QueueTimer.new();
 
-		q.add({ callback: () => {}, timing: q.now().add(1000) });
-		q.add({ callback: () => {}, timing: q.now().add(2000) });
+		q.add({ callback: () => {}, virtualTiming: q.now().add(1000) });
+		q.add({ callback: () => {}, virtualTiming: q.now().add(2000) });
 
 		const last = q.eq(-1);
 
@@ -184,8 +184,8 @@ describe('QueueTimer', () =>
 	{
 		const q = QueueTimer.new();
 
-		q.add({ callback: () => {}, timing: q.now().add(1000) });
-		q.add({ callback: () => {}, timing: q.now().add(2000) });
+		q.add({ callback: () => {}, virtualTiming: q.now().add(1000) });
+		q.add({ callback: () => {}, virtualTiming: q.now().add(2000) });
 
 		const removed = q.remove(0);
 
@@ -197,7 +197,7 @@ describe('QueueTimer', () =>
 	{
 		const q = QueueTimer.new();
 
-		const item = q.add({ callback: () => {}, timing: q.now().add(1000) });
+		const item = q.add({ callback: () => {}, virtualTiming: q.now().add(1000) });
 		const removed = q.remove(item.name);
 
 		assert.ok(removed);
@@ -209,7 +209,7 @@ describe('QueueTimer', () =>
 	{
 		const q = QueueTimer.new();
 
-		const item = q.add({ callback: () => {}, timing: q.now().add(1000) });
+		const item = q.add({ callback: () => {}, virtualTiming: q.now().add(1000) });
 		const removed = q.remove(item);
 
 		assert.ok(removed);
@@ -220,7 +220,7 @@ describe('QueueTimer', () =>
 	{
 		const q = QueueTimer.new();
 
-		q.add({ callback: () => {}, timing: q.now().add(-1000) });
+		q.add({ callback: () => {}, virtualTiming: q.now().add(-1000) });
 		q.sort();
 
 		assert.equal(q.hasExpires(), true);
@@ -230,7 +230,7 @@ describe('QueueTimer', () =>
 	{
 		const q = QueueTimer.new();
 
-		q.add({ callback: () => {}, timing: q.now().add(99999) });
+		q.add({ callback: () => {}, virtualTiming: q.now().add(99999) });
 		q.sort();
 
 		assert.equal(q.hasExpires(), false);
@@ -240,8 +240,8 @@ describe('QueueTimer', () =>
 	{
 		const q = QueueTimer.new();
 
-		q.add({ callback: () => {}, timing: q.now().add(1000) });
-		q.add({ callback: () => {}, timing: q.now().add(3000) });
+		q.add({ callback: () => {}, virtualTiming: q.now().add(1000) });
+		q.add({ callback: () => {}, virtualTiming: q.now().add(3000) });
 		q.sort();
 
 		assert.ok(q.cache.min);
@@ -298,7 +298,7 @@ describe('Timer', () =>
 		assert.ok(item);
 		assert.equal(item['type'], EnumTimerType.setTimeout);
 		assert.equal(t.timer.length, 1);
-		assert.ok(item.timing.isValid());
+		assert.ok(item.virtualTiming.isValid());
 	});
 
 	it('setInterval with duration.Duration should add item to queue', async () =>
@@ -310,7 +310,7 @@ describe('Timer', () =>
 		assert.ok(item);
 		assert.equal(item['type'], EnumTimerType.setInterval);
 		assert.equal(t.timer.length, 1);
-		assert.ok(item.timing.isValid());
+		assert.ok(item.virtualTiming.isValid());
 	});
 
 	it('setTimeout with duration.Duration should convert to absolute time', async () =>
@@ -320,7 +320,7 @@ describe('Timer', () =>
 
 		const item = await t.setTimeout(() => {}, dayjs.duration(5000));
 
-		assert.ok(item.timing.diff(before) >= 4500);
+		assert.ok(item.virtualTiming.diff(before) >= 4500);
 	});
 
 	it('setImmediate should add item with zero timing', async () =>

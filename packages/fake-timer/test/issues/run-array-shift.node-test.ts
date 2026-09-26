@@ -280,10 +280,10 @@ describe('issue: mixed one-shot + periodic timers, single large fast-forward', (
 		 * Record each execution as (label, absolute timing).
 		 *
 		 * 回呼會收到 `current`（佇列項目本身）作為第一個參數，故可從
-		 * `current.timing` 取得該次「本應觸發的絕對時間」，而不會被統一的
+		 * `current.virtualTiming` 取得該次「本應觸發的絕對時間」，而不會被統一的
 		 * 虛擬 now 混淆（run 期間 now 固定不動）。
 		 * The callback receives `current` (the queue item) as its first arg, so we
-		 * read `current.timing` for the absolute scheduled time — not the fixed
+		 * read `current.virtualTiming` for the absolute scheduled time — not the fixed
 		 * virtual `now`, which stays constant during the run.
 		 */
 		const order: Array<{ label: string; at: number }> = [];
@@ -296,9 +296,9 @@ describe('issue: mixed one-shot + periodic timers, single large fast-forward', (
 		const base = t.timer.now().valueOf();
 
 		const T = (label: string, delay: number) =>
-			t.setTimeout((item: any) => order.push({ label, at: item.timing.valueOf() - base }), delay);
+			t.setTimeout((item: any) => order.push({ label, at: item.virtualTiming.valueOf() - base }), delay);
 		const I = (label: string, delay: number) =>
-			t.setInterval((item: any) => order.push({ label, at: item.timing.valueOf() - base }), delay);
+			t.setInterval((item: any) => order.push({ label, at: item.virtualTiming.valueOf() - base }), delay);
 
 		// 插入順序即 id 順序（id 自增），同 timing 時依 id 升冪交錯。
 		// Insertion order == id order; same timing interleaves by id ascending.

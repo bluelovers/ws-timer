@@ -11,7 +11,7 @@
 
 `FakeTimeService.advance(ms)` 裡有三處依賴 fake-timer 內部：
 
-1. 手刻「逐格走到觸發時刻」的迴圈，用 `timer.sort()` / `timer.cache.min` / `timer.data.fake_init`
+1. 手刻「逐格走到觸發時刻」的迴圈，用 `timer.sort()` / `timer.cache.min` / `timer.data.virtual_init`
    自己重組「下一個觸發時刻」。
 2. 重入分支直接呼叫 `timer.update(...)` 繞過 `advance()` 的 time-jump 防護。
 3. 註解聲稱「回呼讀到排程邊界」是「對應原生計時器逐次觸發的行為」——這句話本身是對原生行為的誤解。
@@ -37,7 +37,7 @@
 ```ts
 const t = new FakeTimer();
 const seen = [];
-t.setInterval(() => seen.push(t.timer.now().diff(t.timer.data.fake_init)), 100);
+t.setInterval(() => seen.push(t.timer.now().diff(t.timer.data.virtual_init)), 100);
 t.start(350);
 seen; // => [350, 350, 350]   （不是 [100, 200, 300]）
 ```
@@ -68,7 +68,7 @@ if (this.running) {
   `FakeTimer.advance()` / `start()`。`timer` 雖是公開屬性，但其 `update`/`sort`/`cache`/`data` 屬於內部結構。
 - fake-timer 的 `advance()` 在 run 進行中**刻意丟 `TypeError`**（time-jump guard），文件寫著
   「a callback must not mutate `now` mid-run」。這段程式碼卻用 `update()` 繞過這道防護去改 `now`。
-- 後果：`_runCore` 在 run 開始時就把 `now` 抓進區域變數。你在回呼裡用 `update()` 改了 `fake_now`，
+- 後果：`_runCore` 在 run 開始時就把 `now` 抓進區域變數。你在回呼裡用 `update()` 改了 `virtual_now`，
   但 `_runCore` 手上的 `now` 是舊的，導致這一輪 run 可能**提早結束或漏跑/重跑**，只能靠外層迴圈補救——脆弱。
 
 **為什麼它「需要」這樣**：測試要求「回呼內呼叫 `advance(100)`，當下 `now()` 要立刻反映 200」。但 fake-timer 的
@@ -96,14 +96,14 @@ nextTimerAt(): number | null {
   const clock = this.clock;
   clock.sort();                                  // 內部：重新排序佇列
   const min = clock.cache.min;                   // 內部：min/max 快取
-  return min == null ? null : min.diff(clock.data.fake_init);  // 內部：data.fake_init
+  return min == null ? null : min.diff(clock.data.virtual_init);  // 內部：data.virtual_init
 }
 ```
 
 然後在 `advance()` 的迴圈裡用 `this.fakeTimer.start(next - this.now())` 逐格推進。
 
 **這其實是 fake-timer 已經有的語意**：`start(-1)` 的語意就是「跳到最早排程並執行」（見 `docs/README.md` §5）。
-也就是說，那段 `sort()` + `cache.min` + `data.fake_init` 的手刻邏輯，是在**重新發明 `start(-1)`**。
+也就是說，那段 `sort()` + `cache.min` + `data.virtual_init` 的手刻邏輯，是在**重新發明 `start(-1)`**。
 
 **為什麼它沒直接用 `start(-1)`**：因為 `start(-1)` 讀 `cache.min` 的時機在 `sort()` **之前**，而
 `remove()`/`clearTimeout()` 並不會刷新 `cache.min`。所以取消計時器後 `start(-1)` 會跳到**失效**的 `cache.min`
@@ -128,7 +128,7 @@ advance(ms: number): void {
 }
 ```
 
-- 不需要迴圈、不需要 `sort()`/`cache.min`/`data.fake_init`、不需要 `timer.update`。
+- 不需要迴圈、不需要 `sort()`/`cache.min`/`data.virtual_init`、不需要 `timer.update`。
 - 若需要「回呼錯誤不要中斷整輪、最後拋第一個」，在 `setTimeout` 外包一層 `try/catch` 收集即可（對公開 API 的合理使用）。
 - 若需要「邊界時間」語意：請視為自行擴充，集中內部存取並清楚註解；它**不是** fake-timer 提供的，也**不是**原生行為。
 
@@ -142,5 +142,5 @@ advance(ms: number): void {
 - 回呼內想觸發更多計時器：用 `setTimeout`/`setInterval` 排程（已到期的會自動併入同輪 run）。
 - `start(-1)` 會跳到最早排程並執行；但 `remove()`/`clearTimeout()` 後 `cache.min` 不刷新，可能跳到失效值（甚至往回跳）。
   安全做法：先 `timer.sort()` 再 `start(-1)`，或用 `run()` / 正數 `advance(ms)`。
-- 讀時鐘：`timer.now()` 是 dayjs；經過毫秒 = `timer.now().diff(timer.data.fake_init)`。
+- 讀時鐘：`timer.now()` 是 dayjs；經過毫秒 = `timer.now().diff(timer.data.virtual_init)`。
 - 不要把 `timer.update` / `timer.sort` / `timer.cache` / `timer.data` 拿來重組排程邏輯（內部結構，會變）。

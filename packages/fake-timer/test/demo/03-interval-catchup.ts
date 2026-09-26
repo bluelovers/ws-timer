@@ -31,7 +31,7 @@ function check(label: string, cond: boolean): void
 
 	t.setInterval(() => {
 		count++;
-		times.push(t.timer.now().diff(t.timer.data.fake_init));
+		times.push(t.timer.now().diff(t.timer.data.virtual_init));
 	}, 100);
 
 	// 一口氣推進 350ms：應補償觸發 100 / 200 / 300 三次

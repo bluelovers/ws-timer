@@ -182,7 +182,7 @@ describe('Timer args — Web/API/Window.setTimeout compatibility', () =>
 		assert.equal(fired, 1);
 	});
 
-	it('callback can read registration time (current.added) and elapsed delay from start', () =>
+	it('callback can read registration time (current.virtualAdded) and elapsed delay from start', () =>
 	{
 		const t = new Timer();
 		const infos: any[] = [];
@@ -190,15 +190,15 @@ describe('Timer args — Web/API/Window.setTimeout compatibility', () =>
 
 		t.setTimeout((current, self) => {
 			infos.push({
-				added: current.added?.valueOf(),
-				elapsed: self.timer.now().diff(self.timer.data.fake_init),
+				virtualAdded: current.virtualAdded?.valueOf(),
+				elapsed: self.timer.now().diff(self.timer.data.virtual_init),
 			});
 		}, 250);
 
 		t.start(250);
 
 		assert.equal(infos.length, 1);
-		assert.equal(infos[0].added, registeredAt); // 註冊時間 = 排程當下虛擬時間
+		assert.equal(infos[0].virtualAdded, registeredAt); // 註冊時間 = 排程當下虛擬時間
 		assert.equal(infos[0].elapsed, 250);        // 從起始時間過了 250ms（虛擬 delay）
 	});
 
@@ -272,12 +272,12 @@ describe('normalizeDelay (shared delay validation)', () =>
 
 describe('initTime (public accessor for the initial virtual clock)', () =>
 {
-	it('exposes the initial virtual time as a dayjs, equal to underlying timer.data.fake_init', () =>
+	it('exposes the initial virtual time as a dayjs, equal to underlying timer.data.virtual_init', () =>
 	{
 		const t = new Timer();
 
 		assert.ok(dayjs.isDayjs(t.initTime));
-		assert.equal(t.initTime.valueOf(), (t.timer.data.fake_init as dayjs.Dayjs).valueOf());
+		assert.equal(t.initTime.valueOf(), (t.timer.data.virtual_init as dayjs.Dayjs).valueOf());
 	});
 
 	it('initTime equals now() before any time advance', () =>

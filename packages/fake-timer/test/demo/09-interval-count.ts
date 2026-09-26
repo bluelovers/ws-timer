@@ -9,7 +9,7 @@ const log: string[] = [];
 
 t.setInterval((current) =>
 {
-	log.push(`tick #${current.count} @ ${current.timing.diff(t.timer.data.fake_init)}ms`);
+	log.push(`tick #${current.count} @ ${current.virtualTiming.diff(t.timer.data.virtual_init)}ms`);
 }, 50);
 
 t.start(200); // 預期 50/100/150/200 → 4 次

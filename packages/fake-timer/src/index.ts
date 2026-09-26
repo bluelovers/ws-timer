@@ -53,7 +53,7 @@ export interface ITimer
 	/** 取得虛擬時鐘的初始時間（t=0 基準），不必操作底層 `timer.data` / Get the initial virtual clock time (t=0 reference), without touching the underlying `timer.data` */
 	readonly initTime: dayjs.Dayjs;
 
-	/** 推進虛擬時間（同步，不執行回呼）/ Advance fake time (synchronous, does not run callbacks) */
+	/** 推進虛擬時間（同步，不執行回呼）/ Advance virtual time (synchronous, does not run callbacks) */
 	advance(amount?: IDurationInput): this;
 
 	/** 同步執行所有到期項目（不等待回呼）/ Synchronously run expired items (does not await callbacks) */
@@ -65,10 +65,10 @@ export interface ITimer
 	/** 以生成器逐個執行到期項目並回傳生成器（不回傳 this）/ Run expired items one-by-one as a generator (does NOT return this) */
 	runGenerator(): Generator<ITimeQueueItem, void, void>;
 
-	/** 推進虛擬時間並同步執行到期項目 / Advance fake time and synchronously run expired items */
+	/** 推進虛擬時間並同步執行到期項目 / Advance virtual time and synchronously run expired items */
 	start(amount?: IDurationInput): this;
 
-	/** 推進虛擬時間並非同步執行到期項目 / Advance fake time and asynchronously run expired items */
+	/** 推進虛擬時間並非同步執行到期項目 / Advance virtual time and asynchronously run expired items */
 	startAsync(amount?: IDurationInput): Promise<this>;
 
 	/** 暫停進行中的 run，並將虛擬時間修正為下一個待執行項目的觸發時間 / Pause the in-progress run and correct virtual time to the next pending item's timing */
@@ -188,15 +188,15 @@ export class FakeTimer implements ITimer
 	 *
 	 * 使用時機 / When to use：
 	 *   需要「自建立以來經過的毫秒數」時：`self.timer.now().diff(self.initTime)`。
-	 *   Use it to compute elapsed fake time since creation: `self.timer.now().diff(self.initTime)`.
+	 *   Use it to compute elapsed virtual time since creation: `self.timer.now().diff(self.initTime)`.
 	 *
 	 * 優先使用 / Prefer：
-	 *   請用 `initTime` 取代直接讀取底層 `timer.data.fake_init` —— 這是公開取值 API，不必操作內部 `data`。
-	 *   Prefer `initTime` over reaching into the internal `timer.data.fake_init`; this is the public accessor.
+	 *   請用 `initTime` 取代直接讀取底層 `timer.data.virtual_init` —— 這是公開取值 API，不必操作內部 `data`。
+	 *   Prefer `initTime` over reaching into the internal `timer.data.virtual_init`; this is the public accessor.
 	 */
 	public get initTime(): dayjs.Dayjs
 	{
-		return this.timer.data.fake_init as dayjs.Dayjs;
+		return this.timer.data.virtual_init as dayjs.Dayjs;
 	}
 
 	/**
@@ -277,7 +277,7 @@ export class FakeTimer implements ITimer
 
 		const item = this.timer.add({
 			callback: callback,
-			timing: timing,
+			virtualTiming: timing,
 			interval: type === EnumTimerType.setInterval ? timing : undefined,
 			params: params,
 			type: type,
@@ -470,9 +470,9 @@ export class FakeTimer implements ITimer
 	};
 
 	/**
-	 * 重置整個計時器：清空佇列並將虛擬時間還原回初始值（fake_init），同時重設識別碼計數器。
+	 * 重置整個計時器：清空佇列並將虛擬時間還原回初始值（virtual_init），同時重設識別碼計數器。
 	 * Reset the whole timer: clear the queue, restore the fake clock to its initial value
-	 * (fake_init), and reset the id counter.
+	 * (virtual_init), and reset the id counter.
 	 *
 	 * 共用 QueueTimer.clear() 與 TimeCore.reset() 作為單一實作來源。
 	 * Reuses QueueTimer.clear() and TimeCore.reset() as the single implementation sources.
@@ -492,7 +492,7 @@ export class FakeTimer implements ITimer
 
 	/**
 	 * 推進虛擬時間（同步，不執行任何回呼）
-	 * Advance fake time (synchronous; does not run any callbacks)
+	 * Advance virtual time (synchronous; does not run any callbacks)
 	 *
 	 * 若 amount 為負數，改用佇列中最早的時間作為推進量（跳轉至最早到期項目）。
 	 * If amount is negative, jump to the earliest expiry by using the queue's minimum timing.
@@ -526,7 +526,7 @@ export class FakeTimer implements ITimer
 			amount = this.timer.cache.min ?? 0;
 		}
 
-		/** 推進虛擬時間 / Advance fake time */
+		/** 推進虛擬時間 / Advance virtual time */
 		this.timer.update(amount);
 
 		/** 重新排序佇列 / Re-sort the queue */
@@ -600,7 +600,7 @@ export class FakeTimer implements ITimer
 			{
 				const mid = (lo + hi) >> 1;
 				const m = pending[mid];
-				const d = m.timing.diff(item.timing);
+				const d = m.virtualTiming.diff(item.virtualTiming);
 
 				// (timing 升冪, id 升冪)：m 應排在 item 之前時向右收斂
 				// (timing asc, id asc): converge right when m should come before item
@@ -635,7 +635,7 @@ export class FakeTimer implements ITimer
 
 			seen.add(item);
 
-			if (now.diff(item.timing) >= 0)
+			if (now.diff(item.virtualTiming) >= 0)
 			{
 				insert(item);
 			}
@@ -660,7 +660,7 @@ export class FakeTimer implements ITimer
 				this._current = current;
 
 			/** 佇列已排序，最早者若未到期即可停止 / earliest item unexpired → stop */
-			if (now.diff(current.timing) < 0)
+			if (now.diff(current.virtualTiming) < 0)
 			{
 				break;
 			}
@@ -683,7 +683,7 @@ export class FakeTimer implements ITimer
 			}
 
 			/** 記錄實際執行時間 / Record actual execution time */
-			current.active = dayjs();
+			current.realActive = dayjs();
 
 			/**
 			 * 將項目交給驅動器執行回呼（同步或 async）；
@@ -701,7 +701,7 @@ export class FakeTimer implements ITimer
 			}
 
 			/** 記錄結束時間 / Record end time */
-			current.ending = dayjs();
+			current.realEnding = dayjs();
 
 			/** 加入已完成快取 / Add to done cache */
 			this.cache.done.push(current);
@@ -720,7 +720,7 @@ export class FakeTimer implements ITimer
 
 			if (current.type === EnumTimerType.setInterval && current.interval != null)
 			{
-				const oldTiming = current.timing as dayjs.Dayjs;
+				const oldTiming = current.virtualTiming as dayjs.Dayjs;
 				const nextTiming = oldTiming.add(current.interval as duration.Duration);
 
 				/**
@@ -732,7 +732,7 @@ export class FakeTimer implements ITimer
 				 */
 				if (nextTiming.valueOf() > oldTiming.valueOf() && nextTiming.valueOf() <= now.valueOf())
 				{
-					current.timing = nextTiming;
+					current.virtualTiming = nextTiming;
 
 					insert(current);
 
@@ -745,7 +745,7 @@ export class FakeTimer implements ITimer
 				 * Next tick beyond window (or non-advancing interval): timing advanced to
 				 * nextTiming, kept in the live queue for a future run; not re-inserted here.
 				 */
-				current.timing = nextTiming;
+				current.virtualTiming = nextTiming;
 			}
 			else
 			{
@@ -923,7 +923,7 @@ export class FakeTimer implements ITimer
 
 	/**
 	 * 推進虛擬時間並同步執行到期的計時器
-	 * Advance fake time and synchronously run expired timers
+	 * Advance virtual time and synchronously run expired timers
 	 *
 	 * @param amount - 推進的時間量，可為毫秒數或 Duration 物件 / Amount of time to advance
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
@@ -954,7 +954,7 @@ export class FakeTimer implements ITimer
 
 	/**
 	 * 推進虛擬時間並非同步執行到期的計時器
-	 * Advance fake time and asynchronously run expired timers
+	 * Advance virtual time and asynchronously run expired timers
 	 *
 	 * @param amount - 推進的時間量，可為毫秒數或 Duration 物件 / Amount of time to advance
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
@@ -1025,9 +1025,9 @@ export class FakeTimer implements ITimer
 
 		for (const q of this.timer.queue)
 		{
-			if (q !== cur && (next == null || q.timing.diff(next) < 0))
+			if (q !== cur && (next == null || q.virtualTiming.diff(next) < 0))
 			{
-				next = q.timing;
+				next = q.virtualTiming;
 			}
 		}
 
@@ -1046,7 +1046,7 @@ export class FakeTimer implements ITimer
 		 * Correct the virtual time to the next pending item's fire time (unchanged if none remain). */
 		if (next)
 		{
-			this.timer.data.fake_now = next;
+			this.timer.data.virtual_now = next;
 		}
 
 		return this;
@@ -1101,7 +1101,7 @@ export class FakeTimer implements ITimer
 		 * Correct the virtual time back to the value before this run started (undoing the time jump). */
 		if (startNow)
 		{
-			this.timer.data.fake_now = startNow;
+			this.timer.data.virtual_now = startNow;
 		}
 
 		return this;
@@ -1242,7 +1242,7 @@ export class UnsafeGlobalFakeTimer extends FakeTimer
 
 	/**
 	 * 將 Date.now / performance.now 替換為讀取虛擬時間，以便測試依賴真實時鐘的程式碼。
-	 * Replace Date.now / performance.now with the fake time, for testing code that reads the real clock.
+	 * Replace Date.now / performance.now with the virtual time, for testing code that reads the real clock.
 	 *
 	 * 警告：此為「全域副作用」，會影響整個處理程序。請務必配對呼叫 uninstallGlobalClock() 還原。
 	 * WARNING: this is a GLOBAL side-effect affecting the whole process. Always pair it with
@@ -1282,7 +1282,7 @@ export class UnsafeGlobalFakeTimer extends FakeTimer
 
 		if (perf && this._originalPerfNow)
 		{
-			perf.now = () => this.timer.now().valueOf() - (this.timer.data.fake_init as dayjs.Dayjs).valueOf();
+			perf.now = () => this.timer.now().valueOf() - (this.timer.data.virtual_init as dayjs.Dayjs).valueOf();
 		}
 
 		this._clockInstalled = true;

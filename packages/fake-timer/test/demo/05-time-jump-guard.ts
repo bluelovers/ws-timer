@@ -52,9 +52,9 @@ function check(label: string, cond: boolean): void
 		log.push(`advance() threw TypeError = ${threw}`);
 
 		// (2) start() 在 run 進行中是 no-op
-		const before = t.timer.now().diff(t.timer.data.fake_init);
+		const before = t.timer.now().diff(t.timer.data.virtual_init);
 		t.start(100); // no-op while run active
-		const after = t.timer.now().diff(t.timer.data.fake_init);
+		const after = t.timer.now().diff(t.timer.data.virtual_init);
 		log.push(`start() no-op = ${before === after}`);
 
 		// (3) 正確：在回呼內「排程」一個已到期的計時器 → 同一輪就會執行

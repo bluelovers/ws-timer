@@ -9,7 +9,7 @@
  *     - clearAll(): 清空佇列但不動時鐘 / clear queue without touching the clock
  *     - reset():    清空佇列並將時鐘還原至初始值 / clear queue AND reset the clock to its initial value
  *     - requestAnimationFrame / cancelAnimationFrame: 遊戲主迴圈用的影格排程 / frame scheduling for game loops
- *     - installGlobalClock / uninstallGlobalClock: 將 Date.now / performance.now 對齊虛擬時間 / align Date.now / performance.now with fake time
+ *     - installGlobalClock / uninstallGlobalClock: 將 Date.now / performance.now 對齊虛擬時間 / align Date.now / performance.now with virtual time
  *
  * Usage: tsx --test test/issues/extra-api.node-test.ts
  */
@@ -37,7 +37,7 @@ describe('issue: clearAll / reset / requestAnimationFrame / global clock', () =>
 
 		assert.equal(ret, t, 'clearAll returns the instance (chainable)');
 		assert.equal(t.timer.length, 0, 'queue should be empty');
-		assert.equal(t.timer.now().diff(t.timer.data.fake_init), 0, 'clock must be unchanged');
+		assert.equal(t.timer.now().diff(t.timer.data.virtual_init), 0, 'clock must be unchanged');
 	});
 
 	it('reset clears the queue AND resets the clock', () =>
@@ -46,13 +46,13 @@ describe('issue: clearAll / reset / requestAnimationFrame / global clock', () =>
 		t.setTimeout(() => {}, 1000);
 		t.advance(500);
 
-		assert.equal(t.timer.now().diff(t.timer.data.fake_init), 500);
+		assert.equal(t.timer.now().diff(t.timer.data.virtual_init), 500);
 
 		const ret = t.reset();
 
 		assert.equal(ret, t, 'reset returns the instance (chainable)');
 		assert.equal(t.timer.length, 0, 'queue should be empty');
-		assert.equal(t.timer.now().diff(t.timer.data.fake_init), 0, 'clock should be back to init');
+		assert.equal(t.timer.now().diff(t.timer.data.virtual_init), 0, 'clock should be back to init');
 	});
 
 	it('requestAnimationFrame fires after one frame interval', () =>
@@ -119,7 +119,7 @@ describe('issue: clearAll / reset / requestAnimationFrame / global clock', () =>
 		assert.equal((t as any).uninstallGlobalClock, undefined, 'uninstallGlobalClock must live on the subclass only');
 	});
 
-	it('UnsafeGlobalFakeTimer.installGlobalClock makes Date.now / performance.now track fake time, then restores', () =>
+	it('UnsafeGlobalFakeTimer.installGlobalClock makes Date.now / performance.now track virtual time, then restores', () =>
 	{
 		const t = new UnsafeTimer();
 		const originalDateNow = Date.now;
@@ -128,13 +128,13 @@ describe('issue: clearAll / reset / requestAnimationFrame / global clock', () =>
 
 		try
 		{
-			const before = Date.now();          // equals fake_init in ms
+			const before = Date.now();          // equals virtual_init in ms
 			const perfBefore = (globalThis as any).performance?.now?.() ?? 0;
 
 			t.advance(1000);
 
-			assert.equal(Date.now(), before + 1000, 'Date.now should advance with fake time');
-			assert.equal((globalThis as any).performance?.now?.() ?? 0, perfBefore + 1000, 'performance.now should advance with fake time');
+			assert.equal(Date.now(), before + 1000, 'Date.now should advance with virtual time');
+			assert.equal((globalThis as any).performance?.now?.() ?? 0, perfBefore + 1000, 'performance.now should advance with virtual time');
 		}
 		finally
 		{

@@ -37,7 +37,7 @@ function check(label: string, cond: boolean): void
 	t.setInterval(() => {
 		// 回呼內讀到的時鐘
 		// clock read inside the callback
-		seen.push(t.timer.now().diff(t.timer.data.fake_init));
+		seen.push(t.timer.now().diff(t.timer.data.virtual_init));
 	}, 100);
 
 	// 一口氣推進 350ms
