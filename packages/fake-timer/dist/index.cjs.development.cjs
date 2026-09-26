@@ -1,5 +1,7 @@
 'use strict';
 
+Object.defineProperty(exports, '__esModule', { value: true });
+
 var dayjs = require('dayjs');
 require('dayjs/plugin/duration');
 require('dayjs/plugin/minMax');
@@ -48,6 +50,12 @@ function isValidDate(who) {
 function toDuration(value) {
   return dayjs.isDuration(value) ? value : dayjs.duration(value);
 }
+function normalizeFiniteDelay(ms, value, whenZero = 0) {
+  if (!Number.isFinite(ms)) {
+    throw new RangeError(`fake-timer: delay must resolve to a finite number of milliseconds; received ${String(value)} ` + `(Infinity / -Infinity / NaN / dayjs.duration(NaN) / dayjs.duration(Infinity) are not allowed).`);
+  }
+  return ms > 0 ? value : whenZero !== null && whenZero !== void 0 ? whenZero : 0;
+}
 /**
  * 驗證並正規化 delay，對齊標準 Web API 的處理方式（集中複用，不在各呼叫點重複寫死）。
  * Validate and normalize a delay, aligning with the standard Web API (shared/reusable, not inlined).
@@ -58,21 +66,76 @@ function toDuration(value) {
  * - `dayjs.Duration` 解析後非有限（dayjs.duration(NaN) / dayjs.duration(Infinity)）→ 拋 `RangeError`。
  * - 負數 delay → 箝成 `0`（標準 Web API：timeout < 0 視為 0）。
  *
+ * 數值與 Duration 兩條路徑委託給 normalizeFiniteDelay 處理，僅傳入各自的 ms 取法（whenZero 預設 0）。
+ * Both the number and Duration paths delegate to normalizeFiniteDelay, passing only their own way of getting ms
+ * (whenZero defaults to 0).
+ *
  * @param delay - 延遲（數值 / Duration / undefined / null）/ delay (number / Duration / undefined / null)
  * @returns 有限且有效的 delay（number | duration.Duration）
  */
-function normalizeDelay(delay) {
+function normalizeDelay(delay, safeMinDelay) {
   const value = delay !== null && delay !== void 0 ? delay : 0;
   if (typeof value === 'number') {
-    if (!Number.isFinite(value)) {
-      throw new RangeError(`fake-timer: delay must be a finite number; received ${String(delay)} ` + `(Infinity / -Infinity / NaN are not allowed — they create uncontrolled timers).`);
-    }
-    return value < 0 ? 0 : value;
+    return normalizeFiniteDelay(value, value, safeMinDelay);
   }
-  if (!Number.isFinite(value.asMilliseconds())) {
-    throw new RangeError(`fake-timer: delay Duration must resolve to a finite number of milliseconds; received ${String(delay)} ` + `(dayjs.duration(NaN) / dayjs.duration(Infinity) are not allowed).`);
+  return normalizeFiniteDelay(value.asMilliseconds(), value, safeMinDelay);
+}
+const DEFAULT_MIN_DELAY = 100;
+/**
+ * normalizeDelay 的安全版：當正規化結果會是 0（undefined / null、負數、或 Duration(0)）時，
+ * 改以 safeMinDelay 替代，確保任何「視為 0」的延遲都至少間隔 safeMinDelay。
+ * Safe variant of normalizeDelay: when the normalized result would be 0 (undefined / null, a negative,
+ * or a Duration(0)), substitute safeMinDelay instead, so any "treated-as-zero" delay still waits at least
+ * safeMinDelay.
+ *
+ * 實作上直接複用 normalizeFiniteDelay，只把 whenZero 由預設的 0 換成 safeMinDelay。
+ * Internally reuses normalizeFiniteDelay, only swapping whenZero from the default 0 to safeMinDelay.
+ *
+ * @param delay - 同 normalizeDelay / same as normalizeDelay
+ * @param safeMinDelay - 結果為 0 時改用的最小延遲（毫秒，預設 1/10 秒 = 100）/ minimum delay (ms) used when result is 0 (default 1/10 s = 100)
+ */
+function normalizeDelaySafe(delay, safeMinDelay) {
+  return normalizeDelay(delay, safeMinDelay !== null && safeMinDelay !== void 0 ? safeMinDelay : DEFAULT_MIN_DELAY);
+}
+function compareQueueItemIdAsc(a, b) {
+  var _a$id, _b$id;
+  const ai = (_a$id = a.id) !== null && _a$id !== void 0 ? _a$id : 0;
+  const bi = (_b$id = b.id) !== null && _b$id !== void 0 ? _b$id : 0;
+  return ai < bi ? -1 : ai > bi ? 1 : 0;
+}
+function queueSortByTimingThenIdDesc(a, b) {
+  const d = a.virtualTiming.diff(b.virtualTiming);
+  if (d !== 0) {
+    return d;
   }
-  return value.asMilliseconds() < 0 ? 0 : value;
+  return -compareQueueItemIdAsc(a, b);
+}
+function queueSortByTimingThenIdAsc(a, b) {
+  const d = a.virtualTiming.diff(b.virtualTiming);
+  if (d !== 0) {
+    return d;
+  }
+  return compareQueueItemIdAsc(a, b);
+}
+/**
+ * 計算佇列項目相對於「現在」的剩餘延遲（毫秒）。
+ * Compute a queue item's remaining delay (ms) relative to "now".
+ *
+ * 即 item.virtualTiming 與 timer.now() 的差值：正值表示還要等多久才觸發，
+ * 0 或負值表示已到期（含 overdue）。
+ * Returns the difference between item.virtualTiming and timer.now(): positive means how long until it
+ * fires; 0 or negative means it is due (or overdue).
+ *
+ * 只需 timer 提供 now()，因此接受 Pick<TimeCore, 'now'>，不必依賴完整的 FakeTimer / QueueTimer。
+ * Only needs timer.now(); accepts Pick<TimeCore, 'now'> so it does not depend on the full FakeTimer / QueueTimer.
+ *
+ * @param timer - 提供 now() 的時間來源（TimeCore / QueueTimer / FakeTimer.timer 等）
+ *   / time source exposing now() (TimeCore / QueueTimer / FakeTimer.timer, etc.)
+ * @param item - 佇列項目 / the queue item
+ * @returns 剩餘延遲毫秒數 / remaining delay in ms
+ */
+function remainingDelayMilliseconds(timer, item) {
+  return item.virtualTiming.diff(timer.now());
 }
 
 class TimeCore {
@@ -183,14 +246,6 @@ class TimeCore {
   }
 }
 
-/**
- * 計時器回呼函式介面
- * Timer callback function interface
- *
- * @param current - 當前執行的佇列項目（同時是回呼內的 `this`）/ The currently executing queue item (also `this` inside the callback)
- * @param self - 所屬的 FakeTimer 實例 / The owning FakeTimer instance
- */
-
 class QueueTimer extends TimeCore {
   queue = [];
   cache = {
@@ -255,7 +310,7 @@ class QueueTimer extends TimeCore {
    */
   sort = cb => {
     let self = this;
-    this.queue.sort(cb || this.data.sort || queueSortCallback);
+    this.queue.sort(cb || this.data.sort || queueSortByTimingThenIdAsc);
     this._cache_timing(null, true);
     this.queue.map(function (q, index) {
       q.index = index;
@@ -333,13 +388,6 @@ class QueueTimer extends TimeCore {
     return this;
   }
 }
-function queueSortCallback(a, b) {
-  let d = a.virtualTiming.diff(b.virtualTiming);
-  if (d == 0) {
-    return a.id > b.id;
-  }
-  return a.virtualTiming.diff(b.virtualTiming);
-}
 
 class FakeTimer {
   cache = {
@@ -348,6 +396,9 @@ class FakeTimer {
   frameInterval = dayjs.duration(1000 / 60);
   get initTime() {
     return this.timer.initTime;
+  }
+  now() {
+    return this.timer.now();
   }
   /**
    * 自建立以來經過的「虛擬」毫秒數（number，非 dayjs）。
@@ -382,9 +433,14 @@ class FakeTimer {
    * 建立 Timer 實例
    * Create a Timer instance
    *
-   * @param options - 時間配置選項 / Time configuration options
+   * @param options - 時間配置選項；可透過 safeMinDelay 設定最小安全延遲（必須 > 0）
    */
   constructor(options) {
+    const min = options === null || options === void 0 ? void 0 : options.safeMinDelay;
+    if (min !== undefined && (!Number.isFinite(min) || min <= 0)) {
+      throw new RangeError(`fake-timer: safeMinDelay must be a finite number > 0; received ${String(min)}.`);
+    }
+    this.safeMinDelay = min;
     this.timer = QueueTimer.new(options);
   }
   /**
@@ -404,7 +460,7 @@ class FakeTimer {
    */
   _schedule(type, callback, delay, params) {
     var _this$_activeRun;
-    const validatedDelay = normalizeDelay(delay);
+    const validatedDelay = type === EnumTimerType.setImmediate ? normalizeDelay(delay) : normalizeDelaySafe(delay, this.safeMinDelay);
     const timing = toDuration(validatedDelay);
     const item = this.timer.add({
       callback: callback,
@@ -626,11 +682,10 @@ class FakeTimer {
       let lo = 0;
       let hi = pending.length;
       while (lo < hi) {
-        var _m$id, _item$id;
         const mid = lo + hi >> 1;
         const m = pending[mid];
         const d = m.virtualTiming.diff(item.virtualTiming);
-        if (d < 0 || d === 0 && ((_m$id = m.id) !== null && _m$id !== void 0 ? _m$id : 0) < ((_item$id = item.id) !== null && _item$id !== void 0 ? _item$id : 0)) {
+        if (d < 0 || d === 0 && compareQueueItemIdAsc(m, item) < 0) {
           lo = mid + 1;
         } else {
           hi = mid;
@@ -1012,14 +1067,12 @@ class UnsafeGlobalFakeTimer extends FakeTimer {
   };
 }
 const defaultFakeTimer = /*#__PURE__*/new FakeTimer();
-var _ = defaultFakeTimer;
 const setTimeout = defaultFakeTimer.setTimeout;
 const setInterval = defaultFakeTimer.setInterval;
 const setImmediate = defaultFakeTimer.setImmediate;
 const clearTimeout = defaultFakeTimer.clearTimeout;
 const clearInterval = defaultFakeTimer.clearInterval;
 const clearImmediate = defaultFakeTimer.clearImmediate;
-const advance = defaultFakeTimer.advance;
 const run = defaultFakeTimer.run;
 const runAsync = defaultFakeTimer.runAsync;
 const start = defaultFakeTimer.start;
@@ -1028,87 +1081,37 @@ const clearAll = defaultFakeTimer.clearAll;
 const reset = defaultFakeTimer.reset;
 const requestAnimationFrame = defaultFakeTimer.requestAnimationFrame;
 const cancelAnimationFrame = defaultFakeTimer.cancelAnimationFrame;
-// @ts-ignore
-{
-  Object.defineProperty(defaultFakeTimer, "__esModule", {
-    value: true
-  });
-  Object.defineProperty(defaultFakeTimer, "default", {
-    value: defaultFakeTimer
-  });
-  Object.defineProperty(defaultFakeTimer, "FakeTimer", {
-    value: FakeTimer
-  });
-  Object.defineProperty(defaultFakeTimer, "QueueTimer", {
-    value: QueueTimer
-  });
-  Object.defineProperty(defaultFakeTimer, "TimeCore", {
-    value: TimeCore
-  });
-  Object.defineProperty(defaultFakeTimer, "toDuration", {
-    value: toDuration
-  });
-  Object.defineProperty(defaultFakeTimer, "normalizeDelay", {
-    value: normalizeDelay
-  });
-  Object.defineProperty(defaultFakeTimer, "setTimeout", {
-    value: setTimeout
-  });
-  Object.defineProperty(defaultFakeTimer, "setInterval", {
-    value: setInterval
-  });
-  Object.defineProperty(defaultFakeTimer, "setImmediate", {
-    value: setImmediate
-  });
-  Object.defineProperty(defaultFakeTimer, "clearTimeout", {
-    value: clearTimeout
-  });
-  Object.defineProperty(defaultFakeTimer, "clearInterval", {
-    value: clearInterval
-  });
-  Object.defineProperty(defaultFakeTimer, "clearImmediate", {
-    value: clearImmediate
-  });
-  Object.defineProperty(defaultFakeTimer, "advance", {
-    value: advance
-  });
-  Object.defineProperty(defaultFakeTimer, "run", {
-    value: run
-  });
-  Object.defineProperty(defaultFakeTimer, "runAsync", {
-    value: runAsync
-  });
-  Object.defineProperty(defaultFakeTimer, "start", {
-    value: start
-  });
-  Object.defineProperty(defaultFakeTimer, "startAsync", {
-    value: startAsync
-  });
-  Object.defineProperty(defaultFakeTimer, "clearAll", {
-    value: clearAll
-  });
-  Object.defineProperty(defaultFakeTimer, "reset", {
-    value: reset
-  });
-  Object.defineProperty(defaultFakeTimer, "requestAnimationFrame", {
-    value: requestAnimationFrame
-  });
-  Object.defineProperty(defaultFakeTimer, "cancelAnimationFrame", {
-    value: cancelAnimationFrame
-  });
-  Object.defineProperty(defaultFakeTimer, "UnsafeGlobalFakeTimer", {
-    value: UnsafeGlobalFakeTimer
-  });
-  Object.defineProperty(defaultFakeTimer, "getUnsafeGlobalFakeTimer", {
-    value: getUnsafeGlobalFakeTimer
-  });
-}
 
-/**
- * CJS 模組入口點，將 ESM 預設匯出轉為 CommonJS 模組
- * CJS module entry point, converts ESM default export to CommonJS module
- */
-
-// @ts-ignore
-module.exports = _;
+exports.DEFAULT_MIN_DELAY = DEFAULT_MIN_DELAY;
+exports.EnumGlobalClockState = EnumGlobalClockState;
+exports.EnumTimerType = EnumTimerType;
+exports.FakeTimer = FakeTimer;
+exports.QueueTimer = QueueTimer;
+exports.TimeCore = TimeCore;
+exports.UnsafeGlobalFakeTimer = UnsafeGlobalFakeTimer;
+exports.cancelAnimationFrame = cancelAnimationFrame;
+exports.clearAll = clearAll;
+exports.clearImmediate = clearImmediate;
+exports.clearInterval = clearInterval;
+exports.clearTimeout = clearTimeout;
+exports.compareQueueItemIdAsc = compareQueueItemIdAsc;
+exports.default = defaultFakeTimer;
+exports.defaultFakeTimer = defaultFakeTimer;
+exports.getUnsafeGlobalFakeTimer = getUnsafeGlobalFakeTimer;
+exports.isValidDate = isValidDate;
+exports.normalizeDelay = normalizeDelay;
+exports.normalizeDelaySafe = normalizeDelaySafe;
+exports.queueSortByTimingThenIdAsc = queueSortByTimingThenIdAsc;
+exports.queueSortByTimingThenIdDesc = queueSortByTimingThenIdDesc;
+exports.remainingDelayMilliseconds = remainingDelayMilliseconds;
+exports.requestAnimationFrame = requestAnimationFrame;
+exports.reset = reset;
+exports.run = run;
+exports.runAsync = runAsync;
+exports.setImmediate = setImmediate;
+exports.setInterval = setInterval;
+exports.setTimeout = setTimeout;
+exports.start = start;
+exports.startAsync = startAsync;
+exports.toDuration = toDuration;
 //# sourceMappingURL=index.cjs.development.cjs.map
