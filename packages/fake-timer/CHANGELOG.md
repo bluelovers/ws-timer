@@ -3,6 +3,60 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.2](https://github.com/bluelovers/ws-timer/compare/fake-timer@2.0.1...fake-timer@2.0.2) (2026-09-26)
+
+
+### BREAKING CHANGES
+
+* **fake-timer:** 實作執行狀態管理與運行中防護機制
+* **fake-timer:** 重構計時器 API 為同步模式並新增時間推進方法
+
+
+
+### 🐛　Bug Fixes
+
+* **fake-timer:** 修復計時器在回呼中被清除或追加時的執行行為 ([45611bf](https://github.com/bluelovers/ws-timer/commit/45611bfcd90900f6dc250bd9d8e06e2875d98e7e))
+* **fake-timer:** 修復週期性計時器在單次快轉中的觸發邏輯 ([5f9f207](https://github.com/bluelovers/ws-timer/commit/5f9f207403bf870b70ff1a207984036b844ef9b9))
+* **fake-timer:** 防止在空佇列執行 start 時導致 fake_now 變成無效日期 ([e33e095](https://github.com/bluelovers/ws-timer/commit/e33e095713ecdbe7d23f9ee60ebb5f012426a565))
+* **fake-timer:** 修復在執行任務時因陣列位移導致跳過項目的問題 ([22e72ea](https://github.com/bluelovers/ws-timer/commit/22e72eaf51b468602d937f7ba6ab2dd431681288))
+
+
+### ✨　Features
+
+* **fake-timer:** 更新類型定義以支援執行狀態管理與中斷機制 ([4d6f497](https://github.com/bluelovers/ws-timer/commit/4d6f497470c20daa09992b6917c51eef48772db7))
+* **fake-timer:** 實作執行狀態管理與運行中防護機制 ([41d4c02](https://github.com/bluelovers/ws-timer/commit/41d4c0289a203cd1c9cd62b215db397f319d4958))
+* **fake-timer:** 新增 runGenerator 方法以支援生成器迭代執行 ([598e65e](https://github.com/bluelovers/ws-timer/commit/598e65ecfa9c67a8741299825aa1631a767799c6))
+* **fake-timer:** 擴充計時器控制 API 與重構內部排程邏輯 ([191d05b](https://github.com/bluelovers/ws-timer/commit/191d05bf6eb6ef479867000fe3d0c31048849112))
+* **fake-timer:** 新增 requestAnimationFrame 與佇列管理 API ([15ba5a3](https://github.com/bluelovers/ws-timer/commit/15ba5a367916961559cb0c1bd0a13b2e5dab709a))
+* **fake-timer:** 新增 clear* 系列 API 並實作 setInterval 週期性重複功能 ([45b5a95](https://github.com/bluelovers/ws-timer/commit/45b5a952c3baa4dd8126274d277bdbcbb4a7df45))
+
+
+### 📦　Code Refactoring
+
+* **fake-timer:** 優化排程核心邏輯並改用二分插入法 ([fd83219](https://github.com/bluelovers/ws-timer/commit/fd83219169adfddecf8489c9318b7b4e8f8164ee))
+* **fake-timer:** 優化型別匯入與列舉定義 ([0bf7934](https://github.com/bluelovers/ws-timer/commit/0bf793439987c41ddaa8d57d0ebc7831cb0be395))
+* **fake-timer:** 強化型別定義並統一介面參數 ([296bb23](https://github.com/bluelovers/ws-timer/commit/296bb239b11fec7cf59fae8f55a16762d7736aad))
+* **fake-timer:** 使用列舉優化計時器類型與全域狀態管理 ([ecc10b5](https://github.com/bluelovers/ws-timer/commit/ecc10b5fb2280af3a8c634f3a415af4575cc8bb5))
+* **fake-timer:** 重構計時器 API 為同步模式並新增時間推進方法 ([af3ca3a](https://github.com/bluelovers/ws-timer/commit/af3ca3aec1f112d3b9628040f4d21ac66643fff0))
+* **fake-timer:** 將 toDuration 函式移至主入口點並公開 API ([1316d94](https://github.com/bluelovers/ws-timer/commit/1316d945530677c49459946bfd0d9ea097393553))
+
+
+### 📚　Documentation
+
+* **readme:** 更新專案說明文件以提供更完整的 API 指引 ([a34d627](https://github.com/bluelovers/ws-timer/commit/a34d627763bf39a39e64fb6c898719acb53ce076))
+
+
+### 🚨　Tests
+
+* **fake-timer:** 新增亂序排程與多次快轉之邊界測試案例 ([bdd1d6b](https://github.com/bluelovers/ws-timer/commit/bdd1d6b7095d84c3cd9029b38a7c5210bef41bcb))
+
+
+### ♻️　Chores
+
+* **fake-timer:** 優化建置流程與測試腳本執行時機 ([5ede79a](https://github.com/bluelovers/ws-timer/commit/5ede79ac5ff502e75832ea37cc2207660d90b42e))
+
+
+
 ## [2.0.1](https://github.com/bluelovers/ws-timer/compare/fake-timer@1.0.3...fake-timer@2.0.1) (2026-09-21)
 
 
