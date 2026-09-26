@@ -4,7 +4,7 @@ import e from "dayjs/plugin/duration";
 
 import i from "dayjs/plugin/minMax";
 
-import { nanoid as a } from "nanoid";
+import { nanoid as n } from "nanoid";
 
 t.extend(e);
 
@@ -47,7 +47,7 @@ class TimeCore {
 
 t.extend(e), t.extend(i);
 
-let n, s, r = /*#__PURE__*/ function(t) {
+let a, s, r = /*#__PURE__*/ function(t) {
   return t.setTimeout = "setTimeout", t.setInterval = "setInterval", t.setImmediate = "setImmediate", 
   t.requestAnimationFrame = "requestAnimationFrame", t;
 }({});
@@ -70,7 +70,7 @@ class QueueTimer extends TimeCore {
     timing: null
   }, e, {
     id: this.id(),
-    name: a(),
+    name: n(),
     timing: t.isDuration(e.timing) ? this.now().add(e.timing) : e.timing,
     index: this.length
   }), this._cache_timing(e.timing), this.queue.push(e), e);
@@ -121,17 +121,24 @@ class FakeTimer {
     done: []
   };
   frameInterval=t.duration(1000 / 60);
+  _activeRun=null;
+  _gen=null;
+  _runStartNow=null;
+  _current=null;
+  _abort=!1;
   constructor(t) {
     this.timer = QueueTimer.new(t);
   }
-  _schedule(t, e, i, a) {
-    return this.timer.add({
+  _schedule(t, e, i, n) {
+    var a;
+    const s = this.timer.add({
       callback: e,
       timing: toDuration(i),
       interval: t === r.setInterval ? toDuration(i) : void 0,
-      params: a,
+      params: n,
       type: t
     });
+    return null === (a = this._activeRun) || void 0 === a || a.tryAdd(s), s;
   }
   setTimeout=(t, e, ...i) => this._schedule(r.setTimeout, t, e, i);
   setInterval=(t, e, ...i) => this._schedule(r.setInterval, t, e, i);
@@ -147,34 +154,96 @@ class FakeTimer {
   clearAll=() => (this.timer.clear(), this);
   reset=() => (this.timer.clear(), this.timer.reset(), this.cache.done = [], this);
   advance=t => {
+    if (this._activeRun) throw new TypeError("advance() is forbidden while a run is in progress: time jumps during run are not allowed.");
     var e;
     return t < 0 && (t = null !== (e = this.timer.cache.min) && void 0 !== e ? e : 0), 
     this.timer.update(t), this.timer.sort(), this;
   };
   * _runCore() {
-    let e = this.timer.now();
+    const e = this.timer.now();
     this.cache.done = [];
-    const i = [];
-    for (let a = 0; a < this.timer.queue.length; ) {
-      let n = this.timer.queue[a];
-      if (!(e.diff(n.timing) >= 0)) break;
-      n.active = t(), yield n, n.ending = t(), this.cache.done.push(n), this.timer.queue.includes(n) && (this.timer.remove(a), 
-      n.type === r.setInterval && null != n.interval && i.push(n));
+    const i = [ ...this.timer.queue ], n = new WeakSet;
+    for (const t of i) n.add(t);
+    const insert = t => {
+      let e = 0, n = i.length;
+      for (;e < n; ) {
+        var a, s;
+        const r = e + n >> 1, l = i[r], h = l.timing.diff(t.timing);
+        h < 0 || 0 === h && (null !== (a = l.id) && void 0 !== a ? a : 0) < (null !== (s = t.id) && void 0 !== s ? s : 0) ? e = r + 1 : n = r;
+      }
+      i.splice(e, 0, t);
+    };
+    this._activeRun = {
+      now: e,
+      pending: i,
+      seen: n,
+      tryAdd: t => {
+        n.has(t) || (n.add(t), e.diff(t.timing) >= 0 && insert(t));
+      }
+    };
+    try {
+      for (;i.length > 0; ) {
+        const n = i[0];
+        if (this._current = n, e.diff(n.timing) < 0) break;
+        if (this.timer.queue.includes(n)) {
+          if (n.active = t(), yield n, this._abort) break;
+          if (n.ending = t(), this.cache.done.push(n), i.shift(), this.timer.queue.includes(n)) if (n.type === r.setInterval && null != n.interval) {
+            const t = n.timing, i = t.add(n.interval);
+            if (i.valueOf() > t.valueOf() && i.valueOf() <= e.valueOf()) {
+              n.timing = i, insert(n);
+              continue;
+            }
+            n.timing = i;
+          } else this.timer.remove(n);
+        } else i.shift();
+      }
+    } finally {
+      this._activeRun = null, this._gen = null, this._runStartNow = null, this._current = null, 
+      this._abort = !1;
     }
-    for (const t of i) t.timing = t.timing.add(t.interval), this.timer.queue.push(t);
-    i.length ? this.timer.sort() : this.timer._cache_refresh();
+    this.timer.sort();
   }
   run=() => {
-    for (const t of this._runCore()) t.callback(t, this.timer);
+    if (this._activeRun) return this;
+    null == this._runStartNow && (this._runStartNow = this.timer.now());
+    for (const t of this._runGenerator()) ;
     return this;
   };
   runAsync=async () => {
-    for (const t of this._runCore()) await t.callback(t, this.timer);
+    if (this._activeRun) return this;
+    null == this._runStartNow && (this._runStartNow = this.timer.now()), this._gen = this._runCore();
+    for (const t of this._gen) await t.callback(t, this.timer);
     return this;
   };
-  start=t => (this.advance(t), this.timer.hasExpires() && this.run(), this);
-  startAsync=async t => (this.advance(t), this.timer.hasExpires() && await this.runAsync(), 
-  this);
+  * _wrapRunGen() {
+    for (const t of this._runCore()) t.callback(t, this.timer), yield t;
+  }
+  _runGenerator() {
+    return this._activeRun || null == this._gen && (this._gen = this._wrapRunGen()), 
+    this._gen;
+  }
+  runGenerator() {
+    return this._runGenerator();
+  }
+  start=t => (this._activeRun || (this._runStartNow = this.timer.now(), this.advance(t), 
+  this.timer.hasExpires() && this.run()), this);
+  startAsync=async t => (this._activeRun || (this._runStartNow = this.timer.now(), 
+  this.advance(t), this.timer.hasExpires() && await this.runAsync()), this);
+  pause=() => {
+    if (!this._activeRun) return this;
+    const t = this._current;
+    this.timer.sort();
+    let e = null;
+    for (const i of this.timer.queue) i !== t && (null == e || i.timing.diff(e) < 0) && (e = i.timing);
+    return this._abort = !0, t && this.timer.remove(t), e && (this.timer.data.fake_now = e), 
+    this;
+  };
+  cancel=() => {
+    if (!this._activeRun) return this;
+    const t = this._runStartNow, e = this._current;
+    return this._abort = !0, e && this.timer.remove(e), t && (this.timer.data.fake_now = t), 
+    this;
+  };
 }
 
 function getUnsafeGlobalFakeTimer() {
@@ -191,24 +260,24 @@ class UnsafeGlobalFakeTimer extends FakeTimer {
     this._originalDateNow && (Date.now = this._originalDateNow);
     const t = globalThis.performance;
     t && this._originalPerfNow && (t.now = this._originalPerfNow), this._clockInstalled = !1, 
-    n = void 0;
+    a = void 0;
   };
   globalClockState() {
-    return this._clockInstalled ? l.self : null != n ? l.global : l.none;
+    return this._clockInstalled ? l.self : null != a ? l.global : l.none;
   }
   installGlobalClock=() => {
-    if (this._clockInstalled || null != n) return this;
+    if (this._clockInstalled || null != a) return this;
     this._originalDateNow = Date.now;
     const t = globalThis.performance;
     return this._originalPerfNow = t && "function" == typeof t.now ? t.now.bind(t) : void 0, 
     Date.now = () => this.timer.now().valueOf(), t && this._originalPerfNow && (t.now = () => this.timer.now().valueOf() - this.timer.data.fake_init.valueOf()), 
-    this._clockInstalled = !0, n = () => this._doUninstall(), this;
+    this._clockInstalled = !0, a = () => this._doUninstall(), this;
   };
-  uninstallGlobalClock=() => this._clockInstalled || null != n ? null != n ? (n(), 
+  uninstallGlobalClock=() => this._clockInstalled || null != a ? null != a ? (a(), 
   this) : (this._doUninstall(), this) : this;
 }
 
-const h = /*#__PURE__*/ new FakeTimer, o = h.setTimeout, u = h.setInterval, c = h.setImmediate, m = h.clearTimeout, d = h.clearInterval, f = h.clearImmediate, _ = h.advance, g = h.run, w = h.runAsync, k = h.start, v = h.startAsync, p = h.clearAll, b = h.reset, I = h.requestAnimationFrame, q = h.cancelAnimationFrame;
+const h = /*#__PURE__*/ new FakeTimer, o = h.setTimeout, u = h.setInterval, c = h.setImmediate, m = h.clearTimeout, d = h.clearInterval, _ = h.clearImmediate, f = h.advance, g = h.run, w = h.runAsync, v = h.start, k = h.startAsync, p = h.clearAll, b = h.reset, y = h.requestAnimationFrame, I = h.cancelAnimationFrame;
 
-export { l as EnumGlobalClockState, r as EnumTimerType, FakeTimer, QueueTimer, TimeCore, UnsafeGlobalFakeTimer, _ as advance, q as cancelAnimationFrame, p as clearAll, f as clearImmediate, d as clearInterval, m as clearTimeout, h as default, h as defaultFakeTimer, getUnsafeGlobalFakeTimer, I as requestAnimationFrame, b as reset, g as run, w as runAsync, c as setImmediate, u as setInterval, o as setTimeout, k as start, v as startAsync, toDuration };
+export { l as EnumGlobalClockState, r as EnumTimerType, FakeTimer, QueueTimer, TimeCore, UnsafeGlobalFakeTimer, f as advance, I as cancelAnimationFrame, p as clearAll, _ as clearImmediate, d as clearInterval, m as clearTimeout, h as default, h as defaultFakeTimer, getUnsafeGlobalFakeTimer, y as requestAnimationFrame, b as reset, g as run, w as runAsync, c as setImmediate, u as setInterval, o as setTimeout, v as start, k as startAsync, toDuration };
 //# sourceMappingURL=index.esm.mjs.map

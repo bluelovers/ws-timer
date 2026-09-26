@@ -252,6 +252,11 @@ class FakeTimer {
     done: []
   };
   frameInterval = dayjs.duration(1000 / 60);
+  _activeRun = null;
+  _gen = null;
+  _runStartNow = null;
+  _current = null;
+  _abort = false;
   /**
    * 建立 Timer 實例
    * Create a Timer instance
@@ -277,13 +282,16 @@ class FakeTimer {
    * @returns 新增的佇列項目 / The newly added queue item
    */
   _schedule(type, callback, delay, params) {
-    return this.timer.add({
+    var _this$_activeRun;
+    const item = this.timer.add({
       callback: callback,
       timing: toDuration(delay),
       interval: type === EnumTimerType.setInterval ? toDuration(delay) : undefined,
       params: params,
       type: type
     });
+    (_this$_activeRun = this._activeRun) === null || _this$_activeRun === void 0 || _this$_activeRun.tryAdd(item);
+    return item;
   }
   /**
    * 模擬 setTimeout：將回呼函式排入佇列，延遲指定時間後執行
@@ -454,6 +462,9 @@ class FakeTimer {
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
    */
   advance = amount => {
+    if (this._activeRun) {
+      throw new TypeError('advance() is forbidden while a run is in progress: time jumps during run are not allowed.');
+    }
     if (amount < 0) {
       var _this$timer$cache$min;
       amount = (_this$timer$cache$min = this.timer.cache.min) !== null && _this$timer$cache$min !== void 0 ? _this$timer$cache$min : 0;
@@ -463,35 +474,87 @@ class FakeTimer {
     return this;
   };
   *_runCore() {
-    let now = this.timer.now();
+    const now = this.timer.now();
     this.cache.done = [];
-    const reschedule = [];
-    for (let idx = 0; idx < this.timer.queue.length;) {
-      let current = this.timer.queue[idx];
-      if (now.diff(current.timing) >= 0) {
+    const pending = [...this.timer.queue];
+    const seen = new WeakSet();
+    for (const q of pending) {
+      seen.add(q);
+    }
+    const insert = item => {
+      let lo = 0;
+      let hi = pending.length;
+      while (lo < hi) {
+        var _m$id, _item$id;
+        const mid = lo + hi >> 1;
+        const m = pending[mid];
+        const d = m.timing.diff(item.timing);
+        if (d < 0 || d === 0 && ((_m$id = m.id) !== null && _m$id !== void 0 ? _m$id : 0) < ((_item$id = item.id) !== null && _item$id !== void 0 ? _item$id : 0)) {
+          lo = mid + 1;
+        } else {
+          hi = mid;
+        }
+      }
+      pending.splice(lo, 0, item);
+    };
+    const tryAdd = item => {
+      if (seen.has(item)) {
+        return;
+      }
+      seen.add(item);
+      if (now.diff(item.timing) >= 0) {
+        insert(item);
+      }
+    };
+    this._activeRun = {
+      now,
+      pending,
+      seen,
+      tryAdd
+    };
+    try {
+      while (pending.length > 0) {
+        const current = pending[0];
+        this._current = current;
+        if (now.diff(current.timing) < 0) {
+          break;
+        }
+        if (!this.timer.queue.includes(current)) {
+          pending.shift();
+          continue;
+        }
         current.active = dayjs();
         yield current;
+        if (this._abort) {
+          break;
+        }
         current.ending = dayjs();
         this.cache.done.push(current);
-        if (this.timer.queue.includes(current)) {
-          this.timer.remove(idx);
-          if (current.type === EnumTimerType.setInterval && current.interval != null) {
-            reschedule.push(current);
-          }
+        pending.shift();
+        if (!this.timer.queue.includes(current)) {
+          continue;
         }
-      } else {
-        break;
+        if (current.type === EnumTimerType.setInterval && current.interval != null) {
+          const oldTiming = current.timing;
+          const nextTiming = oldTiming.add(current.interval);
+          if (nextTiming.valueOf() > oldTiming.valueOf() && nextTiming.valueOf() <= now.valueOf()) {
+            current.timing = nextTiming;
+            insert(current);
+            continue;
+          }
+          current.timing = nextTiming;
+        } else {
+          this.timer.remove(current);
+        }
       }
+    } finally {
+      this._activeRun = null;
+      this._gen = null;
+      this._runStartNow = null;
+      this._current = null;
+      this._abort = false;
     }
-    for (const item of reschedule) {
-      item.timing = item.timing.add(item.interval);
-      this.timer.queue.push(item);
-    }
-    if (reschedule.length) {
-      this.timer.sort();
-    } else {
-      this.timer._cache_refresh();
-    }
+    this.timer.sort();
   }
   /**
    * 同步執行所有到期的佇列項目
@@ -503,9 +566,13 @@ class FakeTimer {
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
    */
   run = () => {
-    for (const current of this._runCore()) {
-      current.callback(current, this.timer);
+    if (this._activeRun) {
+      return this;
     }
+    if (this._runStartNow == null) {
+      this._runStartNow = this.timer.now();
+    }
+    for (const _ of this._runGenerator()) {}
     return this;
   };
   /**
@@ -518,11 +585,67 @@ class FakeTimer {
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
    */
   runAsync = async () => {
-    for (const current of this._runCore()) {
+    if (this._activeRun) {
+      return this;
+    }
+    if (this._runStartNow == null) {
+      this._runStartNow = this.timer.now();
+    }
+    this._gen = this._runCore();
+    for (const current of this._gen) {
       await current.callback(current, this.timer);
     }
     return this;
   };
+  *_wrapRunGen() {
+    for (const current of this._runCore()) {
+      current.callback(current, this.timer);
+      yield current;
+    }
+  }
+  /**
+   * 取得本輪 run 的生成器（內部 API，即使用者指定的快取邏輯）。
+   * Obtain the generator for this run (internal API — the caching logic the user specified).
+   *
+   * 若已有活躍 run，回傳同一份快取生成器（重入 no-op）；
+   * 否則只要 this._gen 尚未建立（或上一輪已結束被 finally 清空）就建立一次，
+   * 因此即使尚未開始迭代就多次呼叫，也只會得到同一份內部狀態。
+   * If a run is already active, return the same cached generator (re-entrant no-op);
+   * otherwise create it only when this._gen is unset (or was cleared by the previous run's
+   * finally), so repeated calls — even before any iteration — yield the SAME state.
+   *
+   * 快取的生成器為 _wrapRunGen()：會自動觸發回呼，保留原有 runGenerator 的 API 行為。
+   * The cached generator is _wrapRunGen(), which fires callbacks automatically — preserving the
+   * original runGenerator API behavior.
+   *
+   * @returns 執行項目的生成器（不回傳 this）/ generator of executed items (does NOT return this)
+   */
+  _runGenerator() {
+    if (this._activeRun) {
+      return this._gen;
+    }
+    if (this._gen == null) {
+      this._gen = this._wrapRunGen();
+    }
+    return this._gen;
+  }
+  /**
+   * 以生成器逐個執行到期項目（自動觸發回呼並 yield 已執行項目）。
+   * Run expired items one-by-one as a generator (auto-fires callbacks and yields executed items).
+   *
+   * 保留原有 runGenerator 的 API 行為：回呼會被自動呼叫，並逐一 yield 已執行的佇列項目，
+   * 方便呼叫者在項目之間插入觀察或處理邏輯。內部直接採用快取的 _runGenerator() 狀態，
+   * 因此多次呼叫只會得到同一份內部狀態（不會重複產生 / 雙重處理）。
+   * Preserves the original runGenerator API behavior: callbacks are fired automatically and each
+   * executed item is yielded, handy for observing/handling between items. Internally uses the
+   * cached _runGenerator() state, so repeated calls yield the SAME internal state (no duplicate
+   * generation / double-processing).
+   *
+   * @returns 執行項目的生成器（不回傳 this）/ generator of executed items (does NOT return this)
+   */
+  runGenerator() {
+    return this._runGenerator();
+  }
   /**
    * 推進虛擬時間並同步執行到期的計時器
    * Advance fake time and synchronously run expired timers
@@ -531,6 +654,10 @@ class FakeTimer {
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
    */
   start = amount => {
+    if (this._activeRun) {
+      return this;
+    }
+    this._runStartNow = this.timer.now();
     this.advance(amount);
     if (this.timer.hasExpires()) {
       this.run();
@@ -545,9 +672,71 @@ class FakeTimer {
    * @returns this（支援鏈式呼叫）/ this (supports chaining)
    */
   startAsync = async amount => {
+    if (this._activeRun) {
+      return this;
+    }
+    this._runStartNow = this.timer.now();
     this.advance(amount);
     if (this.timer.hasExpires()) {
       await this.runAsync();
+    }
+    return this;
+  };
+  /**
+   * 暫停目前進行中的 run（執行完當前項目後停止）。
+   * Pause the in-progress run (stops after the current item finishes).
+   *
+   * 中斷後會將虛擬時間「修正」為佇列中下一個待執行項目的觸發時間，
+   * 使剩餘計時器保持相對順序、日後可從中斷處續跑。
+   * After interruption, the virtual time is "corrected" to the fire time of the next pending
+   * item, so the remaining timers keep their relative order and can resume later from where
+   * we left off.
+   *
+   * @returns this（支援鏈式呼叫）/ this (supports chaining)
+   */
+  pause = () => {
+    if (!this._activeRun) {
+      return this;
+    }
+    const cur = this._current;
+    this.timer.sort();
+    let next = null;
+    for (const q of this.timer.queue) {
+      if (q !== cur && (next == null || q.timing.diff(next) < 0)) {
+        next = q.timing;
+      }
+    }
+    this._abort = true;
+    if (cur) {
+      this.timer.remove(cur);
+    }
+    if (next) {
+      this.timer.data.fake_now = next;
+    }
+    return this;
+  };
+  /**
+   * 取消目前進行中的 run，並將虛擬時間「修正」回本次 run 開始前的值（撤銷時間跳躍）。
+   * Cancel the in-progress run and "correct" the virtual time back to the value it had before
+   * this run started (undoing the time jump).
+   *
+   * 佇列中的計時器保持不變（僅不再執行本輪剩餘項目）。
+   * Timers in the queue are left unchanged (only the rest of this run is aborted).
+   *
+   * @returns this（支援鏈式呼叫）/ this (supports chaining)
+   */
+  cancel = () => {
+    if (!this._activeRun) {
+      return this;
+    }
+    const startNow = this._runStartNow;
+    const cur = this._current;
+    this._abort = true;
+    if (cur) {
+      this.timer.remove(cur);
+    }
+    if (startNow) {
+      this.timer.data.fake_now = startNow;
     }
     return this;
   };
