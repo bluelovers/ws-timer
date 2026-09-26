@@ -5,7 +5,7 @@
 import { dayjs, duration } from './dayjs';
 import { QueueTimer } from './queue';
 import { TimeCore } from './time';
-import { EnumTimerType, normalizeDelay, toDuration } from './util';
+import { EnumTimerType, compareQueueItemIdAsc, normalizeDelay, toDuration } from './util';
 import { ICallback, IDurationInput, IRemovedTimer, ITimeData, ITimeQueueItem, ITimer, ITimerHandle } from './types';
 
 export type * from './types';
@@ -490,8 +490,13 @@ export class FakeTimer implements ITimer
 		}
 
 		/**
-		 * 二分插入，保持 pending 依 (timing 升冪, id 升冪) 有序（與 queueSortCallback 一致）。
-		 * Binary insert keeping pending ordered by (timing asc, id asc), matching queueSortCallback.
+		 * 二分插入，保持 pending 依 (timing 升冪, id 升冪) 有序（與 queueSortByTimingThenIdAsc 一致）。
+		 * 注意：執行期間經由回呼追加的「同 timing」項目會被插入到目前執行項目之後，
+		 * 因此 id 必須採升冪（較早加入者 id 較小、排前面），pending.shift() 才能正確移除當前項目。
+		 * Binary insert keeping pending ordered by (timing asc, id asc), matching queueSortByTimingThenIdAsc.
+		 * Note: a same-timing item appended inside a callback is inserted AFTER the currently
+		 * executing item, so id must be ascending (earlier items have smaller ids, come first);
+		 * only then does pending.shift() remove the right element.
 		 */
 		const insert = (item: ITimeQueueItem): void =>
 		{
@@ -506,7 +511,9 @@ export class FakeTimer implements ITimer
 
 				// (timing 升冪, id 升冪)：m 應排在 item 之前時向右收斂
 				// (timing asc, id asc): converge right when m should come before item
-				if (d < 0 || (d === 0 && (m.id ?? 0) < (item.id ?? 0)))
+				// id 比較統一交由 compareQueueItemIdAsc 處理，避免規則重複定義
+				// id comparison is delegated to compareQueueItemIdAsc to avoid duplicating the rule
+				if (d < 0 || (d === 0 && compareQueueItemIdAsc(m, item) < 0))
 				{
 					lo = mid + 1;
 				}

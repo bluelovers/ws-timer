@@ -6,8 +6,8 @@
  *
  * 涵蓋的 diff( 使用位置 / Covered diff( usages:
  *   - queue.ts  hasExpires()            : now().diff(cache.min)
- *   - queue.ts  queueSortCallback       : a.virtualTiming.diff(b.virtualTiming)
- *   - queue.ts  queueSortCallback2      : a.virtualTiming.diff(b.virtualTiming)
+ *   - queue.ts  queueSortByTimingThenIdDesc : a.virtualTiming.diff(b.virtualTiming)
+ *   - queue.ts  queueSortByTimingThenIdAsc  : a.virtualTiming.diff(b.virtualTiming)
  *   - index.ts run()                    : now.diff(current.virtualTiming)
  *
  * Usage: tsx --test test/diff.node-test.ts
@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import { dayjs } from '../src/dayjs';
 
 import { FakeTimer as Timer } from '../src/index';
-import { queueSortCallback, queueSortCallback2 } from '../src/util';
+import { queueSortByTimingThenIdDesc, queueSortByTimingThenIdAsc } from '../src/util';
 import { QueueTimer } from '../src/queue';
 
 import { ITimeQueueItem } from '../src/types';
@@ -102,9 +102,9 @@ describe('diff() usage: hasExpires()', () =>
 	});
 });
 
-describe('diff() usage: queueSortCallback()', () =>
+describe('diff() usage: queueSortByTimingThenIdDesc()', () =>
 {
-	it('should return 0 and prefer larger id when timing are equal', () =>
+	it('should return -1 and prefer larger id when timing are equal', () =>
 	{
 		const base = dayjs();
 		const a = makeItem(base, 5);
@@ -114,13 +114,13 @@ describe('diff() usage: queueSortCallback()', () =>
 		// same timing → diff == 0
 		assert.equal(a.virtualTiming.diff(b.virtualTiming), 0);
 
-		// a.id(5) > b.id(3) → a 排在前面（返回 true）
-		// a.id(5) > b.id(3) → a comes first (returns true)
-		assert.equal(queueSortCallback(a, b), true);
+		// a.id(5) > b.id(3) → a 排在前面（回傳 -1；比較子慣例：負數表示 a 在前）
+		// a.id(5) > b.id(3) → a comes first (returns -1; comparator convention: negative means a before b)
+		assert.equal(queueSortByTimingThenIdDesc(a, b), -1);
 
-		// 反過來：b 在前則回傳 false
-		// reversed: b first returns false
-		assert.equal(queueSortCallback(b, a), false);
+		// 反過來：b 在前則回傳 1
+		// reversed: b first returns 1
+		assert.equal(queueSortByTimingThenIdDesc(b, a), 1);
 	});
 
 	it('should return numeric diff when timing differ (earlier first)', () =>
@@ -136,10 +136,10 @@ describe('diff() usage: queueSortCallback()', () =>
 		const d = a.virtualTiming.diff(b.virtualTiming);
 		assert.ok(d < 0);
 
-		// queueSortCallback 回傳 diff 值本身（負數 < 0 → 升冪排序）
-		// queueSortCallback returns the diff value itself (negative < 0 → ascending sort)
-		assert.equal(queueSortCallback(a, b), d);
-		assert.ok(queueSortCallback(a, b) < 0);
+		// queueSortByTimingThenIdDesc 回傳 diff 值本身（負數 < 0 → 升冪排序）
+		// queueSortByTimingThenIdDesc returns the diff value itself (negative < 0 → ascending sort)
+		assert.equal(queueSortByTimingThenIdDesc(a, b), d);
+		assert.ok(queueSortByTimingThenIdDesc(a, b) < 0);
 	});
 
 	it('should return positive diff when a.virtualTiming is later than b.virtualTiming', () =>
@@ -153,14 +153,14 @@ describe('diff() usage: queueSortCallback()', () =>
 		const d = a.virtualTiming.diff(b.virtualTiming);
 		assert.ok(d > 0);
 
-		assert.equal(queueSortCallback(a, b), d);
-		assert.ok(queueSortCallback(a, b) > 0);
+		assert.equal(queueSortByTimingThenIdDesc(a, b), d);
+		assert.ok(queueSortByTimingThenIdDesc(a, b) > 0);
 	});
 });
 
-describe('diff() usage: queueSortCallback2()', () =>
+describe('diff() usage: queueSortByTimingThenIdAsc()', () =>
 {
-	it('should return 0 and prefer smaller id when timing are equal', () =>
+	it('should return -1 and prefer smaller id when timing are equal', () =>
 	{
 		const base = dayjs();
 		const a = makeItem(base, 3);
@@ -170,16 +170,16 @@ describe('diff() usage: queueSortCallback2()', () =>
 		// same timing → diff == 0
 		assert.equal(a.virtualTiming.diff(b.virtualTiming), 0);
 
-		// a.id(3) < b.id(5) → a 排在前面（返回 true）
-		// a.id(3) < b.id(5) → a comes first (returns true)
-		assert.equal(queueSortCallback2(a, b), true);
+		// a.id(3) < b.id(5) → a 排在前面（回傳 -1；比較子慣例：負數表示 a 在前）
+		// a.id(3) < b.id(5) → a comes first (returns -1; comparator convention: negative means a before b)
+		assert.equal(queueSortByTimingThenIdAsc(a, b), -1);
 
-		// 反過來：b(id=5) > a(id=3) → 回傳 false
-		// reversed: b(id=5) > a(id=3) → returns false
-		assert.equal(queueSortCallback2(b, a), false);
+		// 反過來：b(id=5) > a(id=3) → 回傳 1
+		// reversed: b(id=5) > a(id=3) → returns 1
+		assert.equal(queueSortByTimingThenIdAsc(b, a), 1);
 	});
 
-	it('should behave identically to queueSortCallback on timing difference', () =>
+	it('should behave identically to queueSortByTimingThenIdDesc on timing difference', () =>
 	{
 		const t1 = dayjs();
 		const t2 = t1.add(1000);
@@ -189,9 +189,9 @@ describe('diff() usage: queueSortCallback2()', () =>
 
 		// 兩者對於 timing 差異的排序結果一致
 		// Both agree on ordering when timing differ
-		assert.equal(queueSortCallback2(early, late), queueSortCallback(early, late));
-		assert.ok(queueSortCallback2(early, late) < 0);
-		assert.ok(queueSortCallback2(late, early) > 0);
+		assert.equal(queueSortByTimingThenIdAsc(early, late), queueSortByTimingThenIdDesc(early, late));
+		assert.ok(queueSortByTimingThenIdAsc(early, late) < 0);
+		assert.ok(queueSortByTimingThenIdAsc(late, early) > 0);
 	});
 });
 

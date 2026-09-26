@@ -6,7 +6,7 @@ import { dayjs } from './dayjs';
 import { nanoid } from 'nanoid';
 import { TimeCore } from './time';
 import { IRemovedTimer, ISortCallback, ITimeData, ITimeQueueItem, ITimeQueueItemAdd, ITimerHandle } from './types';
-import { queueSortCallback } from './util';
+import { queueSortByTimingThenIdAsc } from './util';
 
 /**
  * 佇列式計時器，繼承 Time 類別
@@ -35,7 +35,7 @@ export class QueueTimer extends TimeCore
 	{
 		super(...arguments);
 
-		//this.data.sort = queueSortCallback;
+		//this.data.sort = queueSortByTimingThenIdAsc;
 	}
 
 	/**
@@ -146,7 +146,7 @@ export class QueueTimer extends TimeCore
 	{
 		let self = this;
 
-		let q = this.queue.sort(cb || this.data.sort || queueSortCallback);
+		let q = this.queue.sort(cb || this.data.sort || queueSortByTimingThenIdAsc);
 
 		/** 重設快取並重新建立時間邊界 / Reset cache and rebuild time boundaries */
 		this._cache_timing(null, true);
