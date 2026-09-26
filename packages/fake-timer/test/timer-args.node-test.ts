@@ -7,7 +7,11 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { FakeTimer as Timer } from '../src/index';
+import dayjs from 'dayjs';
+import duration, { Duration } from 'dayjs/plugin/duration';
+import { FakeTimer as Timer, normalizeDelay } from '../src/index';
+
+dayjs.extend(duration);
 
 describe('Timer args — Web/API/Window.setTimeout compatibility', () =>
 {
@@ -114,5 +118,120 @@ describe('Timer args — Web/API/Window.setTimeout compatibility', () =>
 		await t.startAsync(100);
 
 		assert.deepEqual(received, ['async']);
+	});
+
+	it('throws RangeError on infinite delay (Infinity)', () =>
+	{
+		const t = new Timer();
+		assert.throws(() => t.setTimeout(() => {}, Infinity), RangeError);
+	});
+
+	it('throws RangeError on negative-infinity delay', () =>
+	{
+		const t = new Timer();
+		assert.throws(() => t.setTimeout(() => {}, -Infinity), RangeError);
+	});
+
+	it('throws RangeError on NaN delay', () =>
+	{
+		const t = new Timer();
+		assert.throws(() => t.setTimeout(() => {}, NaN), RangeError);
+	});
+
+	it('throws RangeError on infinite delay for setInterval too', () =>
+	{
+		const t = new Timer();
+		assert.throws(() => t.setInterval(() => {}, Infinity), RangeError);
+	});
+
+	it('still accepts no-delay / finite / Duration delays', () =>
+	{
+		const t = new Timer();
+		let fired = 0;
+
+		t.setTimeout(() => { fired++; });                    // undefined → 0
+		t.setTimeout(() => { fired++; }, 100);                // finite number
+		t.setTimeout(() => { fired++; }, dayjs.duration(100)); // Duration
+
+		t.start(100);
+
+		assert.equal(fired, 3);
+	});
+
+	it('throws RangeError on invalid Duration (dayjs.duration(NaN))', () =>
+	{
+		const t = new Timer();
+		assert.throws(() => t.setTimeout(() => {}, dayjs.duration(NaN)), RangeError);
+	});
+
+	it('throws RangeError on invalid Duration (dayjs.duration(Infinity))', () =>
+	{
+		const t = new Timer();
+		assert.throws(() => t.setTimeout(() => {}, dayjs.duration(Infinity)), RangeError);
+	});
+
+	it('negative delay still fires immediately (standard-aligned, not rejected)', () =>
+	{
+		const t = new Timer();
+		let fired = 0;
+
+		t.setTimeout(() => { fired++; }, -5); // 標準 API 把負數視為 0 → 立即觸發
+
+		t.start(0);
+
+		assert.equal(fired, 1);
+	});
+});
+
+describe('normalizeDelay (shared delay validation)', () =>
+{
+	it('undefined → 0', () =>
+	{
+		assert.equal(normalizeDelay(undefined), 0);
+	});
+
+	it('null → 0', () =>
+	{
+		assert.equal(normalizeDelay(null), 0);
+	});
+
+	it('passes a finite number through unchanged', () =>
+	{
+		assert.equal(normalizeDelay(100), 100);
+	});
+
+	it('clamps a negative number to 0 (standard Web API)', () =>
+	{
+		assert.equal(normalizeDelay(-5), 0);
+	});
+
+	it('throws RangeError on Infinity', () =>
+	{
+		assert.throws(() => normalizeDelay(Infinity), RangeError);
+	});
+
+	it('throws RangeError on NaN', () =>
+	{
+		assert.throws(() => normalizeDelay(NaN), RangeError);
+	});
+
+	it('passes a valid Duration through unchanged', () =>
+	{
+		assert.equal((normalizeDelay(dayjs.duration(100)) as Duration).asMilliseconds(), 100);
+	});
+
+	it('clamps a negative Duration to 0 (standard Web API)', () =>
+	{
+		assert.equal(normalizeDelay(dayjs.duration(-5)), 0);
+	});
+
+	it('throws RangeError on dayjs.duration(NaN)', () =>
+	{
+		assert.throws(() => normalizeDelay(dayjs.duration(NaN)), RangeError);
+	});
+
+	it('throws RangeError on dayjs.duration(Infinity)', () =>
+	{
+		assert.throws(() => normalizeDelay(dayjs.duration(Infinity)), RangeError);
 	});
 });

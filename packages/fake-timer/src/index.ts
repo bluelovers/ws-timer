@@ -100,6 +100,47 @@ export function toDuration(value: IDurationInput): duration.Duration
 }
 
 /**
+ * 驗證並正規化 delay，對齊標準 Web API 的處理方式（集中複用，不在各呼叫點重複寫死）。
+ * Validate and normalize a delay, aligning with the standard Web API (shared/reusable, not inlined).
+ *
+ * 規則 / Rules:
+ * - `undefined` / `null` → `0`（對齊 `setTimeout(func)` 省略 delay）。
+ * - 數值非有限（Infinity / -Infinity / NaN）→ 拋 `RangeError`（避免產生失控計時器）。
+ * - `dayjs.Duration` 解析後非有限（dayjs.duration(NaN) / dayjs.duration(Infinity)）→ 拋 `RangeError`。
+ * - 負數 delay → 箝成 `0`（標準 Web API：timeout < 0 視為 0）。
+ *
+ * @returns 有限且有效的 delay（number | duration.Duration）
+ */
+export function normalizeDelay(delay: IDurationInput | null | undefined): IDurationInput
+{
+	const value = delay ?? 0;
+
+	if (typeof value === 'number')
+	{
+		if (!Number.isFinite(value))
+		{
+			throw new RangeError(
+				`fake-timer: delay must be a finite number; received ${String(delay)} ` +
+				`(Infinity / -Infinity / NaN are not allowed — they create uncontrolled timers).`,
+			);
+		}
+
+		return value < 0 ? 0 : value;
+	}
+
+	// value 為 dayjs.Duration
+	if (!Number.isFinite(value.asMilliseconds()))
+	{
+		throw new RangeError(
+			`fake-timer: delay Duration must resolve to a finite number of milliseconds; received ${String(delay)} ` +
+			`(dayjs.duration(NaN) / dayjs.duration(Infinity) are not allowed).`,
+		);
+	}
+
+	return value.asMilliseconds() < 0 ? 0 : value;
+}
+
+/**
  * 可控計時器類別，實作 ITimer 介面
  * Controllable timer class implementing the ITimer interface
  *
@@ -200,10 +241,14 @@ export class FakeTimer implements ITimer
 	 */
 	protected _schedule(type: EnumTimerType, callback: ICallback, delay: IDurationInput, params: any[]): ITimeQueueItem
 	{
+		const validatedDelay = normalizeDelay(delay);
+
+		const timing = toDuration(validatedDelay);
+
 		const item = this.timer.add({
 			callback: callback,
-			timing: toDuration(delay ?? 0),
-			interval: type === EnumTimerType.setInterval ? toDuration(delay ?? 0) : undefined,
+			timing: timing,
+			interval: type === EnumTimerType.setInterval ? timing : undefined,
 			params: params,
 			type: type,
 		});
@@ -1240,6 +1285,7 @@ if (process.env.TSDX_FORMAT !== 'esm')
 	Object.defineProperty(defaultFakeTimer, "TimeCore", { value: TimeCore });
 
 	Object.defineProperty(defaultFakeTimer, "toDuration", { value: toDuration });
+	Object.defineProperty(defaultFakeTimer, "normalizeDelay", { value: normalizeDelay });
 
 	Object.defineProperty(defaultFakeTimer, "setTimeout", { value: setTimeout });
 	Object.defineProperty(defaultFakeTimer, "setInterval", { value: setInterval });

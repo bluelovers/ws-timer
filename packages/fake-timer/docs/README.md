@@ -73,22 +73,49 @@ t.start(1000); // 推進 1000ms 並執行到期回呼 → 印出 "1s passed"
 
 ### 2.1 回呼簽章 / Callback signature
 
-回呼固定收到兩個參數：
+回呼固定收到 `current` 與 `self` 兩個基礎參數，後面可接 `...params`：
 
-Callbacks always receive two parameters:
+Callbacks always receive the two base parameters `current` and `self`, followed by `...params`:
 
 ```ts
-setTimeout((current, self) => {
+setTimeout((current, self, ...rest) => {
   // current：本次觸發的佇列項目（ITimeQueueItem）
   // self   ：所屬的 FakeTimer 實例
+  // rest   ：呼叫 setTimeout(func, delay, ...args) 時傳入的額外引數
   self.timer.now();        // 虛擬時鐘（dayjs）
   current.timing;          // 這個計時器的排程時間（dayjs）
-}, 1000);
+}, 1000, 'a', 'b');        // ← 'a', 'b' 會在觸發時轉交給 rest
 ```
 
 - `self` 就是 `FakeTimer` 實例，想拿佇列或虛擬時鐘請走 `self.timer`。
 - 回呼內的 `this` **不是** FakeTimer，而是 `current` 佇列項目本身；請用 `self` 取得 FakeTimer，不要依賴 `this`。
-- `self` 是唯一額外參數，沒有第 3 個 `self`/多餘參數。
+- 第 3 個起的 `...params` 來自 `setTimeout(func, delay, ...args)`，觸發時原樣轉交（對齊 Web/API/Window.setTimeout）；
+  `setInterval` 每次重排都沿用同一組 `params`。
+
+### 2.2 對齊標準 setTimeout 用法 / Standard setTimeout usage
+
+`delay` 為可選，省略時等同 `delay = 0`：
+
+`delay` is optional; omitting it is equivalent to `delay = 0`:
+
+```ts
+setTimeout(func);                       // 無 delay → 立即（0ms）
+setTimeout(func, delay);                // 有 delay
+setTimeout(func, delay, param1);        // delay 之後的引數轉交給 func
+setTimeout(func, delay, param1, param2);
+setTimeout(func, delay, param1, /* …, */ paramN);
+```
+
+### 2.3 delay 的限制 / delay constraints
+
+- `delay` 省略時預設為 `0`（立即排入，對齊標準 `setTimeout(func)`）。
+- `Infinity` / `-Infinity` / `NaN` 會**直接拋 `RangeError`**：這類「無限 delay」既不會觸發、又會讓佇列裡出現 `NaN` timing（污染排序），屬不可控誤用，因此改為早期失敗（fail fast）。
+- 無效 `dayjs.Duration` 也會**拋 `RangeError`**：`dayjs.duration(NaN)`（會當場誤觸發）與 `dayjs.duration(Infinity)`（永不觸發）皆解析為非有限毫秒，同屬失控誤用。有效 Duration 為解析後毫秒數有限者。
+- **負數 delay 不拋錯**，對齊標準 Web API：timeout `< 0` 視為 `0`（立即觸發）。數值與 `dayjs.Duration` 負數皆箝成 `0`。
+
+> 上述所有 delay 檢查與正規化都集中在可複用的 `normalizeDelay(delay)`（定義於 `src/index.ts`，與 `toDuration` 相鄰），而非寫死在 `_schedule` 內；`setTimeout` / `setInterval` / `setImmediate` / `requestAnimationFrame` 都經由 `_schedule` 共用同一份邏輯。
+>
+> 標準 Web API 對 `Infinity` 的處理依環境而異（瀏覽器多為永不觸發、Node 會箝成 1ms），行為不可攜。fake-timer 選擇**顯式拋錯**而非默默採用任一種，以避免意外產生失控計時器。
 
 ---
 
