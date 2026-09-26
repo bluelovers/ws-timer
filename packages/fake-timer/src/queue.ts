@@ -223,7 +223,9 @@ export class QueueTimer extends TimeCore
 	add = (q: ITimeQueueItemAdd): ITimeQueueItem =>
 	{
 		/** 若未指定觸發時間，使用當前虛擬時間 / If no trigger time specified, use current fake time */
-		q.timing = q.timing || this.now();
+		const now = this.now();
+
+		q.timing = q.timing || now;
 
 		/**
 		 * 合併預設值與實際值，產生唯一識別碼
@@ -236,8 +238,8 @@ export class QueueTimer extends TimeCore
 		}, q, {
 			id: this.id(),
 			name: nanoid(),
-			timing: dayjs.isDuration(q.timing) ? this.now().add(q.timing) : q.timing,
-			added: this.now(),
+			timing: dayjs.isDuration(q.timing) ? now.add(q.timing) : q.timing,
+			added: now,
 			count: 0,
 			index: this.length,
 		});
