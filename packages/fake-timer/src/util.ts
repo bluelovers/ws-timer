@@ -4,7 +4,8 @@
  */
 
 import { dayjs, duration } from './dayjs';
-import type { IDurationInput } from './queue';
+
+import { IDurationInput, ITimeQueueItem } from './types';
 
 /**
  * 計時器種類（鍵值相等，便於直接比較）
@@ -109,4 +110,50 @@ export function normalizeDelay(delay: IDurationInput | null | undefined): IDurat
 	}
 
 	return value.asMilliseconds() < 0 ? 0 : value;
+}
+
+/**
+ * 內部排序比較子（預設；id 大者排前面）/ Internal sort comparator (default; larger id first)
+ *
+ * 公開 API 不需要直接使用；內部用於維持佇列依 (timing 升冪, id 升冪) 有序。
+ * Not needed by the public API; used internally to keep the queue ordered by (timing asc, id asc).
+ *
+ * 先比較 timing，若相同則以 id 決定順序
+ * Compares timing first; if equal, uses id to determine order
+ */
+export function queueSortCallback(a: ITimeQueueItem, b: ITimeQueueItem)
+{
+	let d = a.virtualTiming.diff(b.virtualTiming);
+
+	//console.log(d, a.id, b.id);
+
+	if (d == 0)
+	{
+		return a.id > b.id ? 1 : 0;
+	}
+
+	return a.virtualTiming.diff(b.virtualTiming);
+}
+
+/**
+ * 內部排序比較子（替代；id 小者排前面）/ Internal sort comparator (alternative; smaller id first)
+ *
+ * 公開 API 不需要直接使用；與 queueSortCallback 相同邏輯，僅 id 相同時排序相反。
+ * Not needed by the public API; same logic as queueSortCallback, reversed only when ids are equal.
+ *
+ * 與 queueSortCallback 相同邏輯，但 id 相同時以 id 較小者排前面
+ * Same logic as queueSortCallback, but when ids are equal, smaller id comes first
+ */
+export function queueSortCallback2(a: ITimeQueueItem, b: ITimeQueueItem)
+{
+	let d = a.virtualTiming.diff(b.virtualTiming);
+
+	//console.log(d, a.id, b.id);
+
+	if (d == 0)
+	{
+		return a.id < b.id ? 1 : 0;
+	}
+
+	return a.virtualTiming.diff(b.virtualTiming);
 }

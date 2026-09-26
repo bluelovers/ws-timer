@@ -4,101 +4,15 @@
 
 import { dayjs, duration } from './dayjs';
 import { QueueTimer } from './queue';
-import type {
-	ICallback,
-	ITimeQueueItem,
-	ITimeQueueItemAdd,
-	ITimeData,
-	ITimerHandle,
-	IDurationInput,
-	IRemovedTimer,
-} from './queue';
 import { TimeCore } from './time';
-import { EnumTimerType, toDuration, normalizeDelay, isValidDate } from './util';
+import { EnumTimerType, normalizeDelay, toDuration } from './util';
+import { ICallback, IDurationInput, IRemovedTimer, ITimeData, ITimeQueueItem, ITimer, ITimerHandle } from './types';
 
+export type * from './types';
 export * from './util';
 
 export { QueueTimer };
 export { TimeCore };
-export { ITimerHandle, IDurationInput, IRemovedTimer };
-
-/**
- * 計時器函式介面，支援數值或 Duration 延遲
- * Timer function interface, supporting number or Duration delay
- */
-export interface ITimerFunc extends Function
-{
-	(callback: ICallback, delay?: number, ...params: any[]): ITimeQueueItem;
-
-	(callback: ICallback, delay?: duration.Duration, ...params: any[]): ITimeQueueItem;
-}
-
-/**
- * 計時器介面，提供標準的 setTimeout / setInterval / setImmediate API
- * Timer interface, providing standard setTimeout / setInterval / setImmediate API
- */
-export interface ITimer
-{
-	/** 模擬原生 setTimeout / Simulate native setTimeout */
-	setTimeout: ITimerFunc;
-
-	/** 模擬原生 setInterval / Simulate native setInterval */
-	setInterval: ITimerFunc;
-
-	/** 模擬原生 setImmediate / Simulate native setImmediate */
-	setImmediate(callback: ICallback, ...params: any[]): ITimeQueueItem;
-
-	/** 模擬原生 clearTimeout / Simulate native clearTimeout */
-	clearTimeout(handle?: ITimerHandle): IRemovedTimer;
-
-	/** 模擬原生 clearInterval / Simulate native clearInterval */
-	clearInterval(handle?: ITimerHandle): IRemovedTimer;
-
-	/** 模擬原生 clearImmediate / Simulate native clearImmediate */
-	clearImmediate(handle?: ITimerHandle): IRemovedTimer;
-
-	/** 取得虛擬時鐘的初始時間（t=0 基準），不必操作底層 `timer.data` / Get the initial virtual clock time (t=0 reference), without touching the underlying `timer.data` */
-	readonly initTime: dayjs.Dayjs;
-
-	/** 自建立以來經過的虛擬毫秒數（純數字，非 dayjs）/ Elapsed virtual milliseconds since creation (plain number, not dayjs) */
-	readonly elapsedMilliseconds: number;
-
-	/** 推進虛擬時間（同步，不執行回呼）/ Advance virtual time (synchronous, does not run callbacks) */
-	advance(amount?: IDurationInput): this;
-
-	/** 同步執行所有到期項目（不等待回呼）/ Synchronously run expired items (does not await callbacks) */
-	run(): this;
-
-	/** 非同步執行所有到期項目（等待每個回呼）/ Asynchronously run expired items (awaits each callback) */
-	runAsync(): Promise<this>;
-
-	/** 以生成器逐個執行到期項目並回傳生成器（不回傳 this）/ Run expired items one-by-one as a generator (does NOT return this) */
-	runGenerator(): Generator<ITimeQueueItem, void, void>;
-
-	/** 推進虛擬時間並同步執行到期項目 / Advance virtual time and synchronously run expired items */
-	start(amount?: IDurationInput): this;
-
-	/** 推進虛擬時間並非同步執行到期項目 / Advance virtual time and asynchronously run expired items */
-	startAsync(amount?: IDurationInput): Promise<this>;
-
-	/** 暫停進行中的 run，並將虛擬時間修正為下一個待執行項目的觸發時間 / Pause the in-progress run and correct virtual time to the next pending item's timing */
-	pause(): this;
-
-	/** 取消進行中的 run，並將虛擬時間修正回本次 run 開始前的值 / Cancel the in-progress run and correct virtual time back to the pre-run value */
-	cancel(): this;
-
-	/** 清空所有佇列項目（不影響時鐘）/ Clear all queued items (does not affect the clock) */
-	clearAll(): this;
-
-	/** 清空佇列並將虛擬時間重置回初始值 / Clear the queue and reset the fake clock to its initial value */
-	reset(): this;
-
-	/** 模擬 requestAnimationFrame：於下一個「影格」觸發回呼 / Simulate requestAnimationFrame: fire on the next frame */
-	requestAnimationFrame(callback: ICallback, ...params: any[]): ITimeQueueItem;
-
-	/** 模擬 cancelAnimationFrame：取消尚未觸發的 rAF 項目 / Simulate cancelAnimationFrame: cancel a pending rAF item */
-	cancelAnimationFrame(handle?: ITimerHandle): IRemovedTimer;
-}
 
 /**
  * 可控計時器類別，實作 ITimer 介面

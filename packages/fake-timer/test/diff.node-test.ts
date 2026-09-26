@@ -18,8 +18,10 @@ import assert from 'node:assert/strict';
 import { dayjs } from '../src/dayjs';
 
 import { FakeTimer as Timer } from '../src/index';
-import { QueueTimer, queueSortCallback, queueSortCallback2 } from '../src/queue';
-import { ITimeQueueItem } from '../src/queue';
+import { queueSortCallback, queueSortCallback2 } from '../src/util';
+import { QueueTimer } from '../src/queue';
+
+import { ITimeQueueItem } from '../src/types';
 
 /**
  * 建立一個帶有 timing 與 id 的佇列項目

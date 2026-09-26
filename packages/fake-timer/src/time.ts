@@ -4,28 +4,7 @@
 
 import { dayjs } from './dayjs';
 import { isValidDate } from './util';
-
-/**
- * 時間資料介面，儲存真實時間與虛擬時間的狀態
- * Time data interface, stores real time and virtual time state
- */
-export interface ITimeDataCore
-{
-	/** 自增識別碼 / Auto-increment identifier */
-	id?: number;
-
-	/** 真實世界初始時間（建立 Time 實例時的實際時間） / Real-world initial time (actual time when Time instance was created) */
-	real_init?: dayjs.Dayjs;
-
-	/** 虛擬時間初始值 / Virtual time initial value */
-	virtual_init?: dayjs.Dayjs;
-
-	/** 虛擬時間當前值（隨 update 推進） / Virtual time current value (advanced via update) */
-	virtual_now?: dayjs.Dayjs;
-
-	/** 上一次 update 前的虛擬時間（用於回溯或差值計算） / Virtual time before last update (used for rollback or diff calculation) */
-	virtual_old?: dayjs.Dayjs;
-}
+import { ITimeDataCore } from './types';
 
 /**
  * 時間基礎類別，提供可控的虛擬時間環境
@@ -223,5 +202,3 @@ export class TimeCore
 		return this;
 	}
 }
-
-export default TimeCore;
