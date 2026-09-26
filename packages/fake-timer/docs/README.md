@@ -3,6 +3,11 @@
 可控的假計時器：手動推進虛擬時間，讓依賴 `setTimeout` / `setInterval` / `setImmediate` /
 `requestAnimationFrame` 的程式碼能瞬間執行，不必真實等待。
 
+> 相關文件 / Related docs：
+> - [`misc-api.md`](./misc-api.md) — 雜項 API（全域時鐘、型別列舉、進階取值 `initTime` / `frameInterval`）。
+> - [`demo-test-index.md`](./demo-test-index.md) — 所有 demo 與 test 的索引（意圖與職責定位）。
+> - [`anti-patterns.md`](./anti-patterns.md) — 反模式與內部 API 使用守則。
+
 ---
 
 ## 0. 設計原則
@@ -42,34 +47,24 @@ t.start(1000); // 推進 1000ms 並執行到期回呼 → 印出 "1s passed"
 
 ---
 
-## 2. 排程 API
+## 2. 排程 API / Scheduling API
 
-| 方法 | 說明 |
-| --- | --- |
-| `setTimeout(cb, delay)` | 一次性延遲計時器 |
-| `setInterval(cb, delay)` | 週期性計時器（到期後以 `timing + interval` 重新排程） |
-| `setImmediate(cb)` | 立即執行（延遲視為 0） |
-| `requestAnimationFrame(cb)` | 於下一個影格觸發（預設間隔 `1000/60` ms） |
+方法簽章、參數與簡例請見套件根 [`README.md`](../README.md) 的「`set` — 排程」章節（此處不再重複列表）。
+The method signatures, parameters, and quick examples live in the package root [`README.md`](../README.md) under "`set` — Scheduling" (not repeated here).
 
-- `delay` 可為毫秒數或 `dayjs` 的 `Duration`。
+重點提醒 / Key reminders：
+- `delay` 可為毫秒數或 `dayjs` 的 `Duration`（`IDurationInput`）。
 - 這些方法**同步**回傳佇列項目 `ITimeQueueItem`（即句柄），不回傳 Promise。
 
 ---
 
-## 3. 執行與推進時間
+## 3. 執行與推進時間 / Running & advancing time
 
-| 方法 | 行為 |
-| --- | --- |
-| `start(amount?)` | 推進時間並同步執行到期項目（**預設使用**） |
-| `run()` | 只執行所有到期項目，不動時鐘 |
-| `advance(amount?)` | 只推進虛擬時間，不執行回呼（僅在 `start`/`run` 做不到時使用） |
-| `startAsync(amount?)` / `runAsync()` | 非同步版本，會 `await` 每個回呼 |
-| `runGenerator()` | 以生成器逐個執行，yield 每個項目 |
-| `pause()` / `cancel()` | 中斷進行中的 run（見原始碼註解） |
+方法簽章、參數與簡例請見套件根 [`README.md`](../README.md) 的「`start` — 推進時間」與「`run` — 執行到期項目」；取消／清除請見「`clear` — 取消與清除」章節。
+The signatures and quick examples live in the package root [`README.md`](../README.md) under "`start` — Advancing time" and "`run` — Running expired items"; cancellation/clearing is under "`clear` — Cancelling & clearing".
 
-取消：`clearTimeout` / `clearInterval` / `clearImmediate` / `cancelAnimationFrame` 接受統一的
-`ITimerHandle`（`number | string | ITimeQueueItem`）。`clearAll()` 清空佇列（時鐘不變）；
-`reset()` 清空佇列並把時鐘重置回初始值。
+- 預設請用 `start(ms)`（= `advance(ms)` + `run()`）。
+- 中斷進行中的 run 使用 `pause()` / `cancel()`，說明見 [`misc-api.md`](./misc-api.md) 的「執行控制 API」。
 
 ### 2.1 回呼簽章 / Callback signature
 
@@ -213,10 +208,12 @@ t.start(-1); // 跳到 1500 並執行
 
 ## 8. 公開 API vs 內部狀態
 
-**公開 API（請只用這些）**：`setTimeout` · `setInterval` · `setImmediate` · `requestAnimationFrame` ·
-`advance` · `run` · `runAsync` · `runGenerator` · `start` · `startAsync` ·
-`clearTimeout` · `clearInterval` · `clearImmediate` · `cancelAnimationFrame` ·
-`clearAll` · `reset` · `pause` · `cancel`。
+**公開 API（請只用這些）**分兩類，各有單一來源 / Public API (use only these) comes in two groups, each with a single source of truth：
+
+- **核心四動詞（set / clear / start / run）**：套件根 [`README.md`](../README.md) 的「主要 API」是唯一規格——涵蓋 `setTimeout` · `setInterval` · `setImmediate` · `requestAnimationFrame` · `advance` · `run` · `runAsync` · `runGenerator` · `start` · `startAsync` · `clearTimeout` · `clearInterval` · `clearImmediate` · `cancelAnimationFrame` · `clearAll` · `reset`。
+  The four core verbs (set / clear / start / run) are specified once in the package root [`README.md`](../README.md) "Main API".
+- **其餘公開 API（雜項）**：全域時鐘、型別列舉、進階取值 `initTime` / `frameInterval`、執行控制 `pause` / `cancel` —— 集中在 [`misc-api.md`](./misc-api.md)。
+  Everything else (global clock, type enums, advanced accessors `initTime` / `frameInterval`, run control `pause` / `cancel`) lives in [`misc-api.md`](./misc-api.md).
 
 **內部狀態（避免直接操作）**：`t.timer.update` · `t.timer.sort` · `t.timer.cache` · `t.timer.data` ·
 `t.timer.queue`。這些可能隨版本改變，且帶有不變式（例如 `cache.min` 在 `remove` 後不刷新）。

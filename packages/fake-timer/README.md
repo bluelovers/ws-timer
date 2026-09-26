@@ -24,12 +24,15 @@ pnpm add fake-timer
 
 設計重點 / Key design points：
 
-- 排程方法（`setTimeout` / `setInterval` / `setImmediate` / `requestAnimationFrame`）**同步**回傳佇列項目 `ITimeQueueItem`，不回傳 Promise。
-  Scheduling methods return the queue item `ITimeQueueItem` **synchronously** (not a Promise).
-- 執行方法分為同步與非同步兩對：`run` / `start`（同步）與 `runAsync` / `startAsync`（非同步，會 `await` 每個回呼）。
+- 排程方法（`set*`）**同步**回傳佇列項目 `ITimeQueueItem`，不回傳 Promise。
+  Scheduling methods (`set*`) return the queue item `ITimeQueueItem` **synchronously** (not a Promise).
+- 執行分為同步與非同步兩對：`run` / `start`（同步）與 `runAsync` / `startAsync`（非同步，會 `await` 每個回呼）。
   Execution comes in sync/async pairs: `run` / `start` (sync) and `runAsync` / `startAsync` (async, awaiting each callback).
 - 取消方法（`clear*` / `cancelAnimationFrame`）接受統一的 `ITimerHandle`（`number | string | ITimeQueueItem`）。
   Cancellation accepts a unified `ITimerHandle` (`number | string | ITimeQueueItem`).
+
+> 預設請用 `start(ms)`（等同 `advance(ms)` + `run()`）。只有在確實需要「只移動時間、稍後再 `run`」時，才直接用 `advance`。
+> Prefer `start(ms)` (= `advance(ms)` + `run()`) by default. Use `advance` directly only when you genuinely need to move time without running yet.
 
 ### 快速開始 / Quick start
 
@@ -44,7 +47,9 @@ fakeTimer.start(1000);
 // → 印出 "1s passed" / prints "1s passed"
 ```
 
-### 排程 API / Scheduling
+---
+
+### `set` — 排程 / Scheduling
 
 | 方法 / Method | 說明 / Description |
 | --- | --- |
@@ -73,45 +78,21 @@ const frame = requestAnimationFrame(() => console.log('frame'));
 fakeTimer.start(1000 / 30);
 ```
 
-### 執行與推進時間 / Running & advancing time
+---
 
-| 方法 / Method | 行為 / Behavior |
-| --- | --- |
-| `advance(amount?)` | 僅推進虛擬時間，不執行回呼 / advance time only, no callbacks |
-| `run()` | 執行所有到期項目（同步，不等待回呼）/ run expired items (sync) |
-| `runAsync()` | 執行所有到期項目（非同步，`await` 每個回呼）/ run expired items (async) |
-| `runGenerator()` | 以生成器逐個執行並 `yield` 每個項目（**不回傳 `this`**）/ run items one-by-one as a generator (**does NOT return `this`**) |
-| `start(amount?)` | 推進時間並同步執行到期項目 / advance + run (sync) |
-| `startAsync(amount?)` | 推進時間並非同步執行到期項目 / advance + run (async) |
-
-```ts
-import fakeTimer, { setTimeout } from 'fake-timer';
-
-setTimeout(() => console.log('a'), 500);
-setTimeout(() => console.log('b'), 1500);
-
-fakeTimer.advance(500);   // 只推進時間 / advance only
-fakeTimer.run();          // 執行 500ms 處到期的 a / runs "a"
-fakeTimer.start(1000);    // 再推進 1000ms 並執行 b / advance 1000ms, runs "b"
-
-// 非同步版本：回呼會被 await（適合回呼內有 async 工作）
-// async version: callbacks are awaited (handy when callbacks do async work)
-await fakeTimer.startAsync(1000);
-
-// runGenerator：以生成器逐個執行，yield 每個已執行的項目（不回傳 this），
-// 方便在項目之間插入觀察或處理邏輯
-// runGenerator: runs items one-by-one, yielding each executed item (not this) —
-// handy for observing/handling between items
-for (const item of fakeTimer.runGenerator())
-{
-	console.log('ran', item.type, 'at', fakeTimer.timer.now().toISOString());
-}
-```
-
-### 取消與清除 / Cancelling & clearing
+### `clear` — 取消與清除 / Cancelling & clearing
 
 `clear*` / `cancelAnimationFrame` 接受 `ITimerHandle`——可用自增 `id`（`number`）、隨機 `name`（`string`），或直接傳入佇列項目本身（`ITimeQueueItem`）。
 Accepts an `ITimerHandle`: the auto-increment `id` (`number`), the random `name` (`string`), or the queue item itself (`ITimeQueueItem`).
+
+| 方法 / Method | 說明 / Description |
+| --- | --- |
+| `clearTimeout(handle?)` | 取消一次性計時器 / cancel a one-shot timer |
+| `clearInterval(handle?)` | 取消週期計時器（停止重排程）/ cancel a repeating timer |
+| `clearImmediate(handle?)` | 取消 `setImmediate` 項目 / cancel an immediate |
+| `cancelAnimationFrame(handle?)` | 取消尚未觸發的 rAF 項目 / cancel a pending rAF |
+| `clearAll()` | 清空佇列，時鐘不變 / clear queue, clock unchanged |
+| `reset()` | 清空佇列並將虛擬時間重置回初始值 / clear queue + reset clock |
 
 ```ts
 import fakeTimer, { setTimeout, clearTimeout, clearAll, reset } from 'fake-timer';
@@ -128,50 +109,63 @@ fakeTimer.clearAll();      // 清空佇列，時鐘不變 / clear queue, clock u
 fakeTimer.reset();         // 清空佇列並將虛擬時間重置 / clear queue + reset clock
 ```
 
-### 全域時鐘（不安全）/ Global clock (UNSAFE)
+---
 
-`UnsafeGlobalFakeTimer` 會直接替換處理程序內的 `Date.now` / `performance.now`。這是**全域副作用**，會影響整個程序，請務必配對 `uninstallGlobalClock()` 還原。
-`UnsafeGlobalFakeTimer` replaces the process-wide `Date.now` / `performance.now`. This is a **global side effect** affecting the whole process — always pair it with `uninstallGlobalClock()`.
+### `start` — 推進時間 / Advancing time
+
+| 方法 / Method | 行為 / Behavior |
+| --- | --- |
+| `start(amount?)` | 推進虛擬時間並同步執行到期項目（= `advance(amount)` + `run()`）/ advance + run (sync) |
+| `startAsync(amount?)` | 推進時間並非同步執行到期項目（`await` 每個回呼）/ advance + run (async) |
+| `advance(amount?)` | 僅推進虛擬時間，不執行回呼 / advance time only, no callbacks |
+
+- `start(-1)` 是內建「逐格前進」語意：跳到最早排程並執行它（見 `docs/misc-api.md` 與 Demo 04）。
+  `start(-1)` is the built-in "step to the earliest timer" semantic (see `docs/misc-api.md` and Demo 04).
+- 非同步回呼請用 `startAsync` / `runAsync`，它們會 `await` 回呼。
+  For async callbacks, use `startAsync` / `runAsync`, which `await` each callback.
 
 ```ts
-import { getUnsafeGlobalFakeTimer } from 'fake-timer';
+import fakeTimer, { setTimeout } from 'fake-timer';
 
-const clock = getUnsafeGlobalFakeTimer();   // 懶惰單例 / lazy singleton
+setTimeout(() => console.log('a'), 500);
+setTimeout(() => console.log('b'), 1500);
 
-clock.installGlobalClock();                 // 替換全域 Date.now / performance.now
-clock.advance(1000);
-console.log(Date.now());                    // 反映虛擬時間 / reflects fake time
+fakeTimer.advance(500);   // 只推進時間 / advance only
+fakeTimer.run();          // 執行 500ms 處到期的 a / runs "a"
+fakeTimer.start(1000);    // 再推進 1000ms 並執行 b / advance 1000ms, runs "b"
 
-clock.uninstallGlobalClock();               // 還原原始實作 / restore originals
-
-// 檢查安裝狀態：'none' | 'self' | 'global'
-// inspect state: 'none' (未安裝) | 'self' (本實例安裝) | 'global' (某實例安裝)
-console.log(clock.globalClockState());
+// 非同步版本：回呼會被 await（適合回呼內有 async 工作）
+// async version: callbacks are awaited (handy when callbacks do async work)
+await fakeTimer.startAsync(1000);
 ```
 
-> 跨實例安全 / Cross-instance safe：即使由實例 A 安裝、實例 B 呼叫 `uninstallGlobalClock()`，也會委託回 A 正確還原。
-> Even if instance A installs and instance B calls `uninstallGlobalClock()`, it delegates to A's restore.
+---
 
-### 型別與列舉 / Types & enums
+### `run` — 執行到期項目 / Running expired items
 
-匯出的型別別名與列舉（單一真理來源）/ Exported type aliases and enums (single source of truth)：
-
-| 名稱 / Name | 定義 / Definition | 用途 / Use |
-| --- | --- | --- |
-| `EnumTimerType` | `setTimeout \| setInterval \| setImmediate \| requestAnimationFrame` | 計時器種類 / timer kind |
-| `EnumGlobalClockState` | `none \| self \| global` | 全域時鐘安裝狀態 / global clock state |
-| `ITimerHandle` | `number \| string \| ITimeQueueItem` | 取消時的指認代號 / cancellation handle |
-| `IDurationInput` | `number \| dayjs.Duration` | 延遲 / 間隔輸入 / delay input |
-| `IRemovedTimer` | `null \| ITimeQueueItem` | 移除結果 / removal result |
+| 方法 / Method | 行為 / Behavior |
+| --- | --- |
+| `run()` | 執行所有到期項目（同步，不等待回呼）/ run expired items (sync) |
+| `runAsync()` | 執行所有到期項目（非同步，`await` 每個回呼）/ run expired items (async) |
+| `runGenerator()` | 以生成器逐個執行並 `yield` 每個項目（**不回傳 `this`**）/ run items one-by-one as a generator (**does NOT return `this`**) |
 
 ```ts
-import { EnumTimerType } from 'fake-timer';
+import fakeTimer, { setTimeout } from 'fake-timer';
 
-if (item.type === EnumTimerType.setInterval)
+setTimeout(() => console.log('a'), 500);
+
+// runGenerator：以生成器逐個執行，yield 每個已執行的項目（不回傳 this），
+// 方便在項目之間插入觀察或處理邏輯
+// runGenerator: runs items one-by-one, yielding each executed item (not this) —
+// handy for observing/handling between items
+for (const item of fakeTimer.runGenerator())
 {
-	console.log('this is a repeating timer');
+	console.log('ran', item.type, 'at', fakeTimer.timer.now().toISOString());
 }
 ```
+
+> 雜項 API（全域時鐘 `UnsafeGlobalFakeTimer`、型別與列舉 `EnumTimerType` / `ITimerHandle` / …、進階取值 `initTime` / `frameInterval`）請見 [`docs/misc-api.md`](./docs/misc-api.md)。
+> Miscellaneous APIs (global clock, types/enums, advanced accessors) live in [`docs/misc-api.md`](./docs/misc-api.md).
 
 ---
 
@@ -197,10 +191,6 @@ if (item.type === EnumTimerType.setInterval)
   若待測程式直接讀取 `Date.now()` / `performance.now()`（而非接收時間參數），使用 `UnsafeGlobalFakeTimer` 替換全域時鐘。
   If the code under test reads `Date.now()` / `performance.now()` directly, patch the global clock with `UnsafeGlobalFakeTimer`.
 
-- **需要佇列可視化或 Duration 輸入的場景 / Queue visibility & Duration input**
-  可透過 `fakeTimer.timer.queue` 與 `fakeTimer.cache.done` 觀察排程與完成結果；`delay` 支援 `dayjs` 的 `Duration`。
-  Inspect scheduling via `fakeTimer.timer.queue` / `fakeTimer.cache.done`; `delay` accepts `dayjs` `Duration`.
-
 ---
 
 ## 注意事項 / Notes
@@ -209,3 +199,16 @@ if (item.type === EnumTimerType.setInterval)
   `set*` / `clear*` / `advance` are **synchronous**; async variants are explicitly named `xxxAsync`.
 - `UnsafeGlobalFakeTimer` 的 `installGlobalClock()` 具有全域副作用，請在測試結尾或 `finally` 區塊中呼叫 `uninstallGlobalClock()`。
   `installGlobalClock()` has global side effects — call `uninstallGlobalClock()` in a `finally` block.
+
+---
+
+## 更多文件 / Further reading
+
+- [`docs/README.md`](./docs/README.md) — 詳細使用說明（設計原則、心智模型、回呼語意）。
+  Detailed usage (design principles, mental model, callback semantics).
+- [`docs/misc-api.md`](./docs/misc-api.md) — 雜項 API：全域時鐘、型別列舉、進階取值。
+  Miscellaneous APIs: global clock, types/enums, advanced accessors.
+- [`docs/anti-patterns.md`](./docs/anti-patterns.md) — 反模式與內部 API 使用守則。
+  Anti-patterns and internal API usage rules.
+- [`docs/demo-test-index.md`](./docs/demo-test-index.md) — 所有 demo 與 test 的索引（意圖與職責定位）。
+  Index of all demos and tests (intent and responsibility).
