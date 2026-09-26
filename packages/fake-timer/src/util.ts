@@ -71,9 +71,9 @@ export function toDuration(value: IDurationInput): duration.Duration
 }
 
 /**
- * 核心正規化：給定已解析出的毫秒數 `ms` 與原始值 `value`，先驗證有限值，再將負數箝成 0。
+ * 核心正規化：給定已解析出的毫秒數 `ms` 與原始值 `value`，先驗證有限值，再將「非正數」箝成 whenZero。
  * Core normalization: given the resolved millisecond amount `ms` and the original `value`,
- * validate finiteness, then clamp negatives to 0.
+ * validate finiteness, then clamp non-positive values to `whenZero`.
  *
  * 數值與 dayjs.Duration 兩條路徑「本質相同」，差別只在「如何取得 ms」：
  * The number and dayjs.Duration paths are *essentially identical*; the only difference is how `ms` is obtained:
@@ -84,10 +84,16 @@ export function toDuration(value: IDurationInput): duration.Duration
  *
  * - ms 非有限 → 拋 RangeError（兩條路徑共用同一處理，訊息合併）。
  *   Non-finite ms → throw RangeError (shared by both paths, with a merged message).
- * - ms < 0 → 回傳 0；否則回傳原始 value（number 或 Duration 交由呼叫方傳入決定）。
- *   ms < 0 → return 0; otherwise return the original value (number or Duration, as passed by the caller).
+ * - ms > 0 → 回傳原始 value（number 或 Duration，由呼叫方傳入決定）。
+ *   ms > 0 → return the original value (number or Duration, as passed by caller).
+ * - ms <= 0（含 0 與負數）→ 回傳 whenZero（預設 0；安全版可傳入 safeMinDelay）。
+ *   ms <= 0 (incl. 0 and negatives) → return whenZero (default 0; the safe variant passes safeMinDelay).
+ *
+ * 用 `ms > 0` 而非 `ms < 0`，是為了讓「延遲為 0」也能被 whenZero 接管——安全版因而能將 0 替換為最小延遲。
+ * Using `ms > 0` (rather than `ms < 0`) lets a zero delay also be taken over by whenZero,
+ * which is exactly what lets the safe variant replace 0 with a minimum delay.
  */
-function normalizeFiniteDelay(ms: number, value: IDurationInput): IDurationInput
+function normalizeFiniteDelay(ms: number, value: IDurationInput, whenZero: IDurationInput = 0): IDurationInput
 {
 	if (!Number.isFinite(ms))
 	{
@@ -97,7 +103,7 @@ function normalizeFiniteDelay(ms: number, value: IDurationInput): IDurationInput
 		);
 	}
 
-	return ms < 0 ? 0 : value;
+	return ms > 0 ? value : (whenZero ?? 0);
 }
 
 /**
@@ -110,24 +116,47 @@ function normalizeFiniteDelay(ms: number, value: IDurationInput): IDurationInput
  * - `dayjs.Duration` 解析後非有限（dayjs.duration(NaN) / dayjs.duration(Infinity)）→ 拋 `RangeError`。
  * - 負數 delay → 箝成 `0`（標準 Web API：timeout < 0 視為 0）。
  *
- * 數值與 Duration 兩條路徑委託給 normalizeFiniteDelay 處理，僅傳入各自的 ms 取法。
- * Both the number and Duration paths delegate to normalizeFiniteDelay, passing only their own way of getting ms.
+ * 數值與 Duration 兩條路徑委託給 normalizeFiniteDelay 處理，僅傳入各自的 ms 取法（whenZero 預設 0）。
+ * Both the number and Duration paths delegate to normalizeFiniteDelay, passing only their own way of getting ms
+ * (whenZero defaults to 0).
  *
  * @param delay - 延遲（數值 / Duration / undefined / null）/ delay (number / Duration / undefined / null)
  * @returns 有限且有效的 delay（number | duration.Duration）
  */
-export function normalizeDelay(delay: IDurationInput | null | undefined): IDurationInput
+export function normalizeDelay(delay: IDurationInput | null | undefined, safeMinDelay?: IDurationInput): IDurationInput
 {
 	const value = delay ?? 0;
 
 	if (typeof value === 'number')
 	{
-		return normalizeFiniteDelay(value, value);
+		return normalizeFiniteDelay(value, value, safeMinDelay);
 	}
 
 	// value 為 dayjs.Duration：以 asMilliseconds() 解析出的毫秒數做驗證與箝制
 	// value is a dayjs.Duration: validate/clamp using its resolved milliseconds
-	return normalizeFiniteDelay(value.asMilliseconds(), value);
+	return normalizeFiniteDelay(value.asMilliseconds(), value, safeMinDelay);
+}
+
+const DEFAULT_MIN_DELAY = 100;
+
+export { DEFAULT_MIN_DELAY }
+
+/**
+ * normalizeDelay 的安全版：當正規化結果會是 0（undefined / null、負數、或 Duration(0)）時，
+ * 改以 safeMinDelay 替代，確保任何「視為 0」的延遲都至少間隔 safeMinDelay。
+ * Safe variant of normalizeDelay: when the normalized result would be 0 (undefined / null, a negative,
+ * or a Duration(0)), substitute safeMinDelay instead, so any "treated-as-zero" delay still waits at least
+ * safeMinDelay.
+ *
+ * 實作上直接複用 normalizeFiniteDelay，只把 whenZero 由預設的 0 換成 safeMinDelay。
+ * Internally reuses normalizeFiniteDelay, only swapping whenZero from the default 0 to safeMinDelay.
+ *
+ * @param delay - 同 normalizeDelay / same as normalizeDelay
+ * @param safeMinDelay - 結果為 0 時改用的最小延遲（毫秒，預設 1/10 秒 = 100）/ minimum delay (ms) used when result is 0 (default 1/10 s = 100)
+ */
+export function normalizeDelaySafe(delay: IDurationInput | null | undefined, safeMinDelay?: number): IDurationInput
+{
+	return normalizeDelay(delay, safeMinDelay ?? DEFAULT_MIN_DELAY);
 }
 
 /**

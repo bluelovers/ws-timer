@@ -8,7 +8,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { dayjs, Duration } from '../src/dayjs';
-import { FakeTimer as Timer, normalizeDelay } from '../src/index';
+import { FakeTimer as Timer } from '../src/index';
+import { DEFAULT_MIN_DELAY, normalizeDelay, normalizeDelaySafe } from '../src/util';
 
 describe('Timer args — Web/API/Window.setTimeout compatibility', () =>
 {
@@ -266,6 +267,60 @@ describe('normalizeDelay (shared delay validation)', () =>
 	it('throws RangeError on dayjs.duration(Infinity)', () =>
 	{
 		assert.throws(() => normalizeDelay(dayjs.duration(Infinity)), RangeError);
+	});
+});
+
+describe('normalizeDelaySafe (substitutes 0 with a minimum delay)', () =>
+{
+	it('uses default safeMinDelay (1/10 s = 100ms) when delay is 0', () =>
+	{
+		assert.equal(normalizeDelaySafe(0), DEFAULT_MIN_DELAY);
+	});
+
+	it('uses default safeMinDelay when delay is undefined / null', () =>
+	{
+		assert.equal(normalizeDelaySafe(undefined), DEFAULT_MIN_DELAY);
+		assert.equal(normalizeDelaySafe(null), DEFAULT_MIN_DELAY);
+	});
+
+	it('uses default safeMinDelay when delay is a negative number', () =>
+	{
+		assert.equal(normalizeDelaySafe(-5), DEFAULT_MIN_DELAY);
+	});
+
+	it('uses default safeMinDelay when delay is a negative Duration', () =>
+	{
+		assert.equal(normalizeDelaySafe(dayjs.duration(-5)), DEFAULT_MIN_DELAY);
+	});
+
+	it('uses default safeMinDelay when delay is a Duration(0)', () =>
+	{
+		assert.equal(normalizeDelaySafe(dayjs.duration(0)), DEFAULT_MIN_DELAY);
+	});
+
+	it('keeps a positive number delay unchanged', () =>
+	{
+		assert.equal(normalizeDelaySafe(100), 100);
+		assert.equal(normalizeDelaySafe(500), 500);
+	});
+
+	it('keeps a positive Duration delay unchanged', () =>
+	{
+		assert.equal((normalizeDelaySafe(dayjs.duration(100)) as Duration).asMilliseconds(), 100);
+	});
+
+	it('still throws RangeError on non-finite delays', () =>
+	{
+		assert.throws(() => normalizeDelaySafe(Infinity), RangeError);
+		assert.throws(() => normalizeDelaySafe(NaN), RangeError);
+		assert.throws(() => normalizeDelaySafe(dayjs.duration(NaN)), RangeError);
+	});
+
+	it('honors a custom safeMinDelay', () =>
+	{
+		assert.equal(normalizeDelaySafe(0, 250), 250);
+		assert.equal(normalizeDelaySafe(-5, 250), 250);
+		assert.equal(normalizeDelaySafe(300, 250), 300);
 	});
 });
 
