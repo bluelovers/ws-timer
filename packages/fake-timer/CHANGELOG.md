@@ -3,6 +3,40 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.0.3](https://github.com/bluelovers/ws-timer/compare/fake-timer@3.0.2...fake-timer@3.0.3) (2026-09-26)
+
+
+### BREAKING CHANGES
+
+* **fake-timer:** 整合安全延遲機制至 FakeTimer 實例
+
+
+
+### ✨　Features
+
+* **fake-timer:** 整合安全延遲機制至 FakeTimer 實例 ([a7c9e7f](https://github.com/bluelovers/ws-timer/commit/a7c9e7fb304cdb9585d3aaa83dc7de446712b1b0))
+* **util:** 新增 normalizeDelaySafe 並強化延遲正規化邏輯 ([f108d1e](https://github.com/bluelovers/ws-timer/commit/f108d1ea6317e2d934044e70d18a70191eb3698d))
+
+
+### 📦　Code Refactoring
+
+* **fake-timer:** 暴露 now() 方法並新增剩餘延遲計算工具 ([4cd178e](https://github.com/bluelovers/ws-timer/commit/4cd178e82e0935021270ce2144e18e20d15d4e2b))
+* **fake-timer:** 優化排序邏輯與延遲正規化機制 ([588534e](https://github.com/bluelovers/ws-timer/commit/588534ead9a991a8f596c27f1684a4cc3db66178))
+* **fake-timer:** 提取型別定義至獨立檔案並重構匯出結構 ([f4e2366](https://github.com/bluelovers/ws-timer/commit/f4e2366a12281724749a3755c36d1feb2822bc15))
+
+
+### 💎　Styles
+
+* **fake-timer:** 優化程式碼格式與型別定義 ([06cc6f3](https://github.com/bluelovers/ws-timer/commit/06cc6f305494b8509be70569f6800ba66859f95b))
+
+
+### 🛠　Build System
+
+* **fake-timer:** 優化延遲正規化邏輯與佇列排序機制 ([c0e96aa](https://github.com/bluelovers/ws-timer/commit/c0e96aabc193dbe8063e8a115ca482945a268f0a))
+* **fake-timer:** 移除 CJS 入口點並簡化匯出邏輯 ([7900ebb](https://github.com/bluelovers/ws-timer/commit/7900ebb4f302c3809a0751a60327414c6c4c49cd))
+
+
+
 ## [3.0.2](https://github.com/bluelovers/ws-timer/compare/fake-timer@3.0.1...fake-timer@3.0.2) (2026-09-26)
 
 
