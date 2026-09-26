@@ -4,7 +4,15 @@
 
 import { dayjs, duration } from './dayjs';
 import { QueueTimer } from './queue';
-import type { ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData, ITimerHandle, IDurationInput, IRemovedTimer } from './queue';
+import type {
+	ICallback,
+	ITimeQueueItem,
+	ITimeQueueItemAdd,
+	ITimeData,
+	ITimerHandle,
+	IDurationInput,
+	IRemovedTimer,
+} from './queue';
 import { TimeCore } from './time';
 import { EnumTimerType, toDuration, normalizeDelay, isValidDate } from './util';
 
@@ -530,7 +538,7 @@ export class FakeTimer implements ITimer
 	 * 使用手動索引遍歷，避免 for...in 搭配 splice 時因陣列位移而跳過項目。
 	 * Uses a manual index loop to avoid for...in + splice skipping items on array shift.
 	 */
-	protected *_runCore(): Generator<ITimeQueueItem, void, void>
+	protected* _runCore(): Generator<ITimeQueueItem, void, void>
 	{
 		const now = this.timer.now();
 
@@ -639,100 +647,100 @@ export class FakeTimer implements ITimer
 				/** 記錄目前正被執行的項目，供 pause / cancel 使用 / record the item being executed, for pause / cancel */
 				this._current = current;
 
-			/** 佇列已排序，最早者若未到期即可停止 / earliest item unexpired → stop */
-			if (now.diff(current.virtualTiming) < 0)
-			{
-				break;
-			}
-
-			/**
-			 * 若該項目已在更早的回呼中被清除（clearTimeout / clearInterval / clearImmediate /
-			 * clearAll / reset），則不應執行——符合真實 API：被取消的計時器永不觸發。
-			 * 必須在 yield 前檢查，否則會發生「已清除的計時器仍被執行」的快照錯誤。
-			 * If the item was already cleared during an earlier callback
-			 * (clearTimeout / clearInterval / clearImmediate / clearAll / reset), it must
-			 * NOT fire — matching the real API where a cancelled timer never runs. This
-			 * check must happen BEFORE yield, otherwise we would re-execute an already
-			 * cancelled timer (the old snapshot bug).
-			 */
-			if (!this.timer.queue.includes(current))
-			{
-				pending.shift();
-
-				continue;
-			}
-
-			/** 記錄實際執行時間 / Record actual execution time */
-			current.realActive = dayjs();
-
-			/**
-			 * 將項目交給驅動器執行回呼（同步或 async）；
-			 * yield 後續的結束時間記錄 / 移除 / 重排程由本生成器在恢復後完成。
-			 * Hand the item to the driver to invoke the callback (sync or async);
-			 * the ending-time / removal / rescheduling after this is done by this generator once it resumes.
-			 */
-			yield current;
-
-			/** 中斷旗標：pause / cancel 在回呼內設定，此處結束本輪 run。
-			 * Abort flag: pause / cancel set this inside a callback; end the run here. */
-			if (this._abort)
-			{
-				break;
-			}
-
-			/** 記錄結束時間 / Record end time */
-			current.realEnding = dayjs();
-
-			/** 加入已完成快取 / Add to done cache */
-			this.cache.done.push(current);
-
-			/** 從臨時陣列移除（無論週期或一次性）/ remove from the temp array (periodic or one-shot) */
-			pending.shift();
-
-			/**
-			 * 若回呼內已自行移除該項目（例如 clearInterval / clearTimeout(current)），則不處理。
-			 * If the callback already removed this item (e.g. clearInterval / clearTimeout(current)), skip handling.
-			 */
-			if (!this.timer.queue.includes(current))
-			{
-				continue;
-			}
-
-			if (current.type === EnumTimerType.setInterval && current.interval != null)
-			{
-				const oldTiming = current.virtualTiming as dayjs.Dayjs;
-				const nextTiming = oldTiming.add(current.interval as duration.Duration);
+				/** 佇列已排序，最早者若未到期即可停止 / earliest item unexpired → stop */
+				if (now.diff(current.virtualTiming) < 0)
+				{
+					break;
+				}
 
 				/**
-				 * 重新排程後「時間有推進」且仍 <= now：就地推進 timing，並以二分插入
-				 * 回到臨時陣列繼續在本輪 run 內觸發（修正單次觸發問題）。
-				 * Rescheduled timing actually advanced AND still <= now: advance timing in
-				 * place and binary-insert back into the temp array to keep firing within
-				 * the SAME run (fixes the single-fire issue).
+				 * 若該項目已在更早的回呼中被清除（clearTimeout / clearInterval / clearImmediate /
+				 * clearAll / reset），則不應執行——符合真實 API：被取消的計時器永不觸發。
+				 * 必須在 yield 前檢查，否則會發生「已清除的計時器仍被執行」的快照錯誤。
+				 * If the item was already cleared during an earlier callback
+				 * (clearTimeout / clearInterval / clearImmediate / clearAll / reset), it must
+				 * NOT fire — matching the real API where a cancelled timer never runs. This
+				 * check must happen BEFORE yield, otherwise we would re-execute an already
+				 * cancelled timer (the old snapshot bug).
 				 */
-				if (nextTiming.valueOf() > oldTiming.valueOf() && nextTiming.valueOf() <= now.valueOf())
+				if (!this.timer.queue.includes(current))
 				{
-					current.virtualTiming = nextTiming;
-
-					insert(current);
+					pending.shift();
 
 					continue;
 				}
 
+				/** 記錄實際執行時間 / Record actual execution time */
+				current.realActive = dayjs();
+
 				/**
-				 * 下一跳超出視窗（或 interval<=0 不推進）：timing 已更新為 nextTiming，
-				 * 留在即時佇列中供未來 run 使用；不插回臨時陣列（本輪不再觸發）。
-				 * Next tick beyond window (or non-advancing interval): timing advanced to
-				 * nextTiming, kept in the live queue for a future run; not re-inserted here.
+				 * 將項目交給驅動器執行回呼（同步或 async）；
+				 * yield 後續的結束時間記錄 / 移除 / 重排程由本生成器在恢復後完成。
+				 * Hand the item to the driver to invoke the callback (sync or async);
+				 * the ending-time / removal / rescheduling after this is done by this generator once it resumes.
 				 */
-				current.virtualTiming = nextTiming;
+				yield current;
+
+				/** 中斷旗標：pause / cancel 在回呼內設定，此處結束本輪 run。
+				 * Abort flag: pause / cancel set this inside a callback; end the run here. */
+				if (this._abort)
+				{
+					break;
+				}
+
+				/** 記錄結束時間 / Record end time */
+				current.realEnding = dayjs();
+
+				/** 加入已完成快取 / Add to done cache */
+				this.cache.done.push(current);
+
+				/** 從臨時陣列移除（無論週期或一次性）/ remove from the temp array (periodic or one-shot) */
+				pending.shift();
+
+				/**
+				 * 若回呼內已自行移除該項目（例如 clearInterval / clearTimeout(current)），則不處理。
+				 * If the callback already removed this item (e.g. clearInterval / clearTimeout(current)), skip handling.
+				 */
+				if (!this.timer.queue.includes(current))
+				{
+					continue;
+				}
+
+				if (current.type === EnumTimerType.setInterval && current.interval != null)
+				{
+					const oldTiming = current.virtualTiming as dayjs.Dayjs;
+					const nextTiming = oldTiming.add(current.interval as duration.Duration);
+
+					/**
+					 * 重新排程後「時間有推進」且仍 <= now：就地推進 timing，並以二分插入
+					 * 回到臨時陣列繼續在本輪 run 內觸發（修正單次觸發問題）。
+					 * Rescheduled timing actually advanced AND still <= now: advance timing in
+					 * place and binary-insert back into the temp array to keep firing within
+					 * the SAME run (fixes the single-fire issue).
+					 */
+					if (nextTiming.valueOf() > oldTiming.valueOf() && nextTiming.valueOf() <= now.valueOf())
+					{
+						current.virtualTiming = nextTiming;
+
+						insert(current);
+
+						continue;
+					}
+
+					/**
+					 * 下一跳超出視窗（或 interval<=0 不推進）：timing 已更新為 nextTiming，
+					 * 留在即時佇列中供未來 run 使用；不插回臨時陣列（本輪不再觸發）。
+					 * Next tick beyond window (or non-advancing interval): timing advanced to
+					 * nextTiming, kept in the live queue for a future run; not re-inserted here.
+					 */
+					current.virtualTiming = nextTiming;
+				}
+				else
+				{
+					/** 一次性計時器：從即時佇列移除（保持順序，不重新排序）/ one-shot: remove from live queue (order-preserving, no re-sort) */
+					this.timer.remove(current);
+				}
 			}
-			else
-			{
-				/** 一次性計時器：從即時佇列移除（保持順序，不重新排序）/ one-shot: remove from live queue (order-preserving, no re-sort) */
-				this.timer.remove(current);
-			}
-		}
 		}
 		finally
 		{
@@ -787,7 +795,8 @@ export class FakeTimer implements ITimer
 
 		// _runGenerator() 回傳的快取生成器已內含回呼觸發，故此處僅需迭代（不必再手動呼叫）。
 		// The cached generator returned by _runGenerator() already fires callbacks, so we only iterate.
-		for (const _ of this._runGenerator()) {}
+		for (const _ of this._runGenerator())
+		{}
 
 		return this;
 	};
@@ -838,7 +847,7 @@ export class FakeTimer implements ITimer
 	 * Internal generator wrapping _runCore(): fires each callback automatically and yields the
 	 * executed item — this is the original runGenerator behavior.
 	 */
-	protected *_wrapRunGen(): Generator<ITimeQueueItem, void, void>
+	protected* _wrapRunGen(): Generator<ITimeQueueItem, void, void>
 	{
 		for (const current of this._runCore())
 		{

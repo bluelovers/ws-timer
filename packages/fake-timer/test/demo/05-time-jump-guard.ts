@@ -36,7 +36,8 @@ function check(label: string, cond: boolean): void
 	const t = new FakeTimer();
 	const log: string[] = [];
 
-	t.setTimeout(() => {
+	t.setTimeout(() =>
+	{
 		log.push('outer ran');
 
 		// (1) advance() 在 run 進行中會丟 TypeError

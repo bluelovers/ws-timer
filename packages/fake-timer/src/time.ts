@@ -96,8 +96,6 @@ export class TimeCore
 		return t;
 	}
 
-
-
 	/**
 	 * 推進虛擬時間
 	 * Advance the virtual time

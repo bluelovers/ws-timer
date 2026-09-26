@@ -34,7 +34,8 @@ function check(label: string, cond: boolean): void
 
 	// 週期計時器，每 100ms 觸發一次
 	// a repeating timer that fires every 100ms
-	t.setInterval(() => {
+	t.setInterval(() =>
+	{
 		// 回呼內讀到的時鐘
 		// clock read inside the callback
 		seen.push(t.timer.now().diff(t.timer.data.virtual_init));
@@ -54,7 +55,11 @@ function check(label: string, cond: boolean): void
 	// ❌ 常見的錯誤預期（fake-timer 不會這樣做）：
 	// ❌ the WRONG expectation (what fake-timer does NOT do):
 	//     seen === [100, 200, 300]
-	check('NOT [100,200,300]（回呼不會各自讀到排程邊界）/ NOT [100,200,300]', JSON.stringify(seen) !== JSON.stringify([100, 200, 300]));
+	check('NOT [100,200,300]（回呼不會各自讀到排程邊界）/ NOT [100,200,300]', JSON.stringify(seen) !== JSON.stringify([
+		100,
+		200,
+		300,
+	]));
 }
 
 console.log('\n— Demo 02 完成：回呼讀到最終時間，符合原生行為 / Demo 02 done —');

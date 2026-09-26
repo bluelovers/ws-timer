@@ -29,7 +29,8 @@ function check(label: string, cond: boolean): void
 	let count = 0;
 	const times: number[] = [];
 
-	t.setInterval(() => {
+	t.setInterval(() =>
+	{
 		count++;
 		times.push(t.timer.now().diff(t.timer.data.virtual_init));
 	}, 100);

@@ -185,7 +185,8 @@ describe('Timer args — Web/API/Window.setTimeout compatibility', () =>
 		const infos: any[] = [];
 		const registeredAt = t.timer.now().valueOf(); // 排程當下的虛擬時間
 
-		t.setTimeout((current, self) => {
+		t.setTimeout((current, self) =>
+		{
 			infos.push({
 				virtualAdded: current.virtualAdded?.valueOf(),
 				elapsed: self.timer.now().diff(self.timer.data.virtual_init),
@@ -204,7 +205,8 @@ describe('Timer args — Web/API/Window.setTimeout compatibility', () =>
 		const t = new Timer();
 		const counts: number[] = [];
 
-		t.setInterval((current) => {
+		t.setInterval((current) =>
+		{
 			counts.push(current.count ?? -1);
 		}, 50);
 

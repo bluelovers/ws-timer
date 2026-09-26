@@ -125,6 +125,7 @@ export interface ISortCallback extends Function
 export interface ISetTimeout extends Function
 {
 	(callback: ICallback, delay: number, immediate: boolean);
+
 	(callback: ICallback, delay: duration.Duration, immediate: boolean);
 }
 
