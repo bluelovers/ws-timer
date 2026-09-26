@@ -178,3 +178,7 @@ openspec/
 !/README.md
 !/CHANGELOG.md
 
+!test/demo
+!test/demo/*
+!test/demo/*.ts
+
