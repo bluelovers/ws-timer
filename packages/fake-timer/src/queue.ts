@@ -70,35 +70,41 @@ export type IRemovedTimer = null | ITimeQueueItem;
  */
 export interface ITimeQueueItem
 {
-	/** 自增識別碼 / Auto-increment identifier */
+	/** 自增識別碼（number）；可作為 clear* / remove 的 ITimerHandle / Auto-increment id (number); usable as an ITimerHandle for clear* / remove */
 	id?: number;
 
-	/** 預計觸發時間 / Scheduled trigger time */
+	/** 預計觸發時間（絕對虛擬時間）；觸發時等於 now() / Scheduled trigger time (absolute virtual time); equals now() at fire */
 	timing?: dayjs.Dayjs;
 
-	/** 註冊時間（排程當下的虛擬時間）/ Registration time (virtual time when scheduled) */
+	/** 註冊時間（排程當下的虛擬時間）；`now().diff(added)` 即原始 delay / Registration time (virtual time when scheduled); `now().diff(added)` gives the original delay */
 	added?: dayjs.Dayjs;
 
-	/** 已觸發次數（每次執行回呼 +1；一次性 timer 固定為 1）/ Fire count (incremented per callback; 1 for one-shot) */
+	/** 已觸發次數（每次執行回呼 +1；一次性 timer 固定為 1）；週期性 setInterval 可讀它判斷第幾次 / Fire count (incremented per callback; 1 for one-shot); setInterval reads it for the Nth fire */
 	count?: number;
 
-	/** 實際開始執行時間 / Actual start execution time */
+	/** 實際「開始」執行的時間；注意是**真實牆鐘**（dayjs()），非虛擬時間 / Actual execution START time — note: REAL wall-clock (dayjs()), not virtual time */
 	active?: dayjs.Dayjs;
 
-	/** 執行結束時間 / Execution end time */
+	/** 執行「結束」時間（回呼返回後才寫入）；同為**真實牆鐘**；`ending.diff(active)` 即回呼真實耗時 / Execution END time (written after the callback returns); also REAL wall-clock; `ending.diff(active)` is the real callback duration */
 	ending?: dayjs.Dayjs;
 
-	/** 隨機唯一識別碼（nanoid）/ Random unique identifier (nanoid) */
+	/** 隨機唯一識別碼（nanoid 字串）；可作為 clear* / remove 的 ITimerHandle / Random unique id (nanoid string); usable as an ITimerHandle */
 	name?: string;
 
 	/** 到期時呼叫的回呼函式 / Callback function to invoke on expiry */
 	callback?: ICallback;
 
-	/** 傳遞給回呼函式的額外參數 / Additional parameters passed to the callback */
+	/** 傳遞給回呼的額外引數（即 `setTimeout(func, delay, ...params)` 的 ...params）/ Extra args forwarded to the callback (the ...params of setTimeout(func, delay, ...params)) */
 	params?: any[],
 
 	/** 計時器種類 / Timer kind */
 	type?: EnumTimerType,
+
+	/** 週期（僅 setInterval 有意義，為 dayjs.Duration）；其它種類為 undefined / Period (only meaningful for setInterval, a dayjs.Duration); undefined for others */
+	interval?: duration.Duration,
+
+	/** 加入佇列時的陣列索引（排序後可能變動，僅供參考）/ Array index at insertion (may shift after sorting; informational only) */
+	index?: number,
 
 	/** 允許額外任意屬性 / Allow any additional properties */
 	[key: string]: any;
@@ -180,16 +186,16 @@ export interface ICallback extends Function
  */
 export class QueueTimer extends TimeCore
 {
-	/** 計時器佇列 / Timer queue */
+	/** 內部佇列（ITimeQueueItem[]）；避免直接操作，請用 FakeTimer 公開 API；見 docs/README.md §8 / Internal queue (ITimeQueueItem[]); avoid direct access — use FakeTimer's public API (see docs/README.md §8) */
 	public queue = [] as ITimeQueueItem[];
 
-	/** 快取佇列中的最小與最大時間 / Cache for min and max times in the queue */
+	/** 內部快取：佇列時間邊界（min / max）；避免直接操作，見 docs/anti-patterns.md 與 docs/README.md §8 / Internal cache: queue time boundaries (min / max); avoid direct access (see docs/anti-patterns.md, docs/README.md §8) */
 	public cache = {
 		min: null,
 		max: null,
 	} as any;
 
-	/** 覆寫父類的 data 型別 / Override parent class data type */
+	/** 內部狀態（real_init / fake_init / fake_now / fake_old 等）；避免直接操作，請用 FakeTimer 公開 API；見 docs/README.md §8 / Internal state (real_init / fake_init / fake_now / fake_old etc.); avoid direct access (see docs/README.md §8) */
 	public override data: ITimeData;
 
 	constructor()
@@ -219,6 +225,13 @@ export class QueueTimer extends TimeCore
 	 * 1. If timing not specified, use current fake time
 	 * 2. If timing is Duration, convert to absolute time (now + duration)
 	 * 3. Generate unique id and name, push to queue
+	 *
+	 * 內部實作 / Internal implementation：公開排程請改用 FakeTimer 的 setTimeout / setInterval /
+	 * setImmediate / requestAnimationFrame；直接呼叫會繞過 delay 正規化（normalizeDelay）與統一的回呼
+	 * 簽章處理（current / self / ...params）。
+	 * Internal: prefer FakeTimer's setTimeout / setInterval / setImmediate / requestAnimationFrame for
+	 * scheduling; calling this directly bypasses delay normalization (normalizeDelay) and the unified
+	 * callback-signature handling (current / self / ...params).
 	 */
 	add = (q: ITimeQueueItemAdd): ITimeQueueItem =>
 	{
@@ -290,6 +303,11 @@ export class QueueTimer extends TimeCore
 	 *
 	 * @param cb - 自訂排序函式，若未提供則使用 data.sort 或預設排序
 	 *             Custom sort function; if not provided, uses data.sort or default sort
+	 *
+	 * 內部實作 / Internal implementation：公開請改用 FakeTimer 的 set* / start / run 來排程與執行；
+	 * 直接排序內部佇列會繞過 time-jump 防護與快取不變式（見 docs/anti-patterns.md）。
+	 * Internal: prefer FakeTimer's set* / start / run for scheduling and execution; sorting the
+	 * internal queue directly bypasses the time-jump guard and cache invariants (see docs/anti-patterns.md).
 	 */
 	sort = (cb?: ISortCallback): this =>
 	{
@@ -330,6 +348,9 @@ export class QueueTimer extends TimeCore
 	 * 依索引移除佇列項目（內部方法）
 	 * Remove queue item by index (internal method)
 	 *
+	 * 避免直接呼叫；公開移除計時器請用 FakeTimer.clear*。
+	 * Avoid calling directly; use FakeTimer.clear* to remove timers publicly.
+	 *
 	 * @returns 被移除的項目，若移除失敗則回傳 null / Removed item, or null if removal failed
 	 */
 	protected _remove = (idx): ITimeQueueItem | null =>
@@ -358,6 +379,11 @@ export class QueueTimer extends TimeCore
 	 * - Number index (used directly as array index)
 	 * - Queue item object (uses its name property for matching)
 	 * - Name string (nanoid-generated unique code)
+	 *
+	 * 內部實作 / Internal implementation：公開請改用 FakeTimer 的 clearTimeout / clearInterval /
+	 * clearImmediate；本方法僅做底層佇列移除，不附帶任何「語意層」保證。
+	 * Internal: prefer FakeTimer's clearTimeout / clearInterval / clearImmediate; this method only
+	 * performs the low-level queue removal without any semantic-layer guarantees.
 	 */
 	remove = (id: ITimerHandle): IRemovedTimer =>
 	{
@@ -395,8 +421,8 @@ export class QueueTimer extends TimeCore
 	};
 
 	/**
-	 * 靜態工廠方法，建立 QueueTimer 實例
-	 * Static factory method to create a QueueTimer instance
+	 * 靜態工廠方法（內部）；公開請用 `new FakeTimer()` 取得計時器。
+	 * Static factory (internal); prefer `new FakeTimer()` to obtain a timer publicly.
 	 */
 	// @ts-ignore
 	static new(options?: ITimeData)
@@ -412,6 +438,9 @@ export class QueueTimer extends TimeCore
 	 * 若差值 >= 0 則表示至少有一個項目已到期
 	 * Logic: compare current fake time with the earliest time in queue (cache.min)
 	 * If diff >= 0, at least one item has expired
+	 *
+	 * 內部用途 / Internal use：公開判斷是否還有到期項目請直接呼叫 FakeTimer 的 start / run 觸發。
+	 * Internal: to actually trigger expired items, call FakeTimer's start / run.
 	 */
 	hasExpires = (): boolean =>
 	{
@@ -426,6 +455,9 @@ export class QueueTimer extends TimeCore
 	 *
 	 * 不影響虛擬時間（時鐘保持不變）。
 	 * Does not affect fake time (the clock stays unchanged).
+	 *
+	 * 內部實作 / Internal implementation：公開請改用 FakeTimer.clearAll()。
+	 * Internal: prefer FakeTimer.clearAll().
 	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
@@ -442,8 +474,10 @@ export class QueueTimer extends TimeCore
 export default QueueTimer;
 
 /**
- * 預設排序回呼函式（id 大者排前面）
- * Default sort callback function (larger id first)
+ * 內部排序比較子（預設；id 大者排前面）/ Internal sort comparator (default; larger id first)
+ *
+ * 公開 API 不需要直接使用；內部用於維持佇列依 (timing 升冪, id 升冪) 有序。
+ * Not needed by the public API; used internally to keep the queue ordered by (timing asc, id asc).
  *
  * 先比較 timing，若相同則以 id 決定順序
  * Compares timing first; if equal, uses id to determine order
@@ -463,8 +497,10 @@ export function queueSortCallback(a: ITimeQueueItem, b: ITimeQueueItem)
 }
 
 /**
- * 替代排序回呼函式（id 小者排前面）
- * Alternative sort callback function (smaller id first)
+ * 內部排序比較子（替代；id 小者排前面）/ Internal sort comparator (alternative; smaller id first)
+ *
+ * 公開 API 不需要直接使用；與 queueSortCallback 相同邏輯，僅 id 相同時排序相反。
+ * Not needed by the public API; same logic as queueSortCallback, reversed only when ids are equal.
  *
  * 與 queueSortCallback 相同邏輯，但 id 相同時以 id 較小者排前面
  * Same logic as queueSortCallback, but when ids are equal, smaller id comes first

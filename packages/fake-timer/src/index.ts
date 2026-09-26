@@ -164,8 +164,18 @@ export class FakeTimer implements ITimer
 	};
 
 	/**
-	 * 每個影格（frame）的間隔，供 requestAnimationFrame 使用
-	 * Per-frame interval used by requestAnimationFrame
+	 * 每個影格（frame）的間隔，供 requestAnimationFrame 使用。
+	 * Per-frame interval used by requestAnimationFrame.
+	 *
+	 * 使用時機 / When to use：
+	 *   僅在使用 `requestAnimationFrame` 時有意義；預設 1000/60 ms（約 60fps）。
+	 *   Only relevant when using `requestAnimationFrame`; defaults to 1000/60 ms (~60fps).
+	 *
+	 * 優先使用 / Prefer：
+	 *   一般計時器（`setTimeout` / `setInterval`）不受 `frameInterval` 影響，請用其各自 `delay` 控制間隔；
+	 *   只有在想模擬不同刷新率時，才覆寫本屬性。
+	 *   Ordinary timers (`setTimeout` / `setInterval`) ignore `frameInterval` — control them via their own
+	 *   `delay`; only override this when simulating a different refresh rate.
 	 *
 	 * 預設為 1000/60 毫秒（約 60fps）。可直接覆寫以模擬不同刷新率。
 	 * Defaults to 1000/60 ms (~60fps). Override directly to simulate other refresh rates.
@@ -173,11 +183,16 @@ export class FakeTimer implements ITimer
 	public frameInterval: duration.Duration = dayjs.duration(1000 / 60);
 
 	/**
-	 * 虛擬時鐘的初始時間（t=0 基準）。
-	 * The initial virtual clock time (t=0 reference).
+	 * 虛擬時鐘的初始時間（t=0 基準），唯讀。
+	 * The initial virtual clock time (t=0 reference), read-only.
 	 *
-	 * 對外開放的便捷取值，不必透過底層 `timer.data.fake_init` 操作。
-	 * Public convenience accessor — no need to reach into the underlying `timer.data.fake_init`.
+	 * 使用時機 / When to use：
+	 *   需要「自建立以來經過的毫秒數」時：`self.timer.now().diff(self.initTime)`。
+	 *   Use it to compute elapsed fake time since creation: `self.timer.now().diff(self.initTime)`.
+	 *
+	 * 優先使用 / Prefer：
+	 *   請用 `initTime` 取代直接讀取底層 `timer.data.fake_init` —— 這是公開取值 API，不必操作內部 `data`。
+	 *   Prefer `initTime` over reaching into the internal `timer.data.fake_init`; this is the public accessor.
 	 */
 	public get initTime(): dayjs.Dayjs
 	{
@@ -287,6 +302,9 @@ export class FakeTimer implements ITimer
 	 * 同步 API：直接回傳佇列項目，不回傳 Promise。
 	 * Synchronous API: returns the queue item directly (no Promise).
 	 *
+	 * @see start - 推進虛擬時間並執行到期回呼（優先使用）/ advance + run (preferred)
+	 * @see run - 只執行到期回呼（不推進時間）/ run only
+	 *
 	 * @param callback - 到期時執行的回呼函式 / Callback function to execute on expiry
 	 * @param delay - 延遲時間，可為毫秒數或 Duration 物件 / Delay time, can be milliseconds or Duration object
 	 * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
@@ -305,6 +323,9 @@ export class FakeTimer implements ITimer
 	 * Synchronous API: returns the queue item directly. Periodic repetition is handled
 	 * uniformly by run / runAsync.
 	 *
+	 * @see start - 推進虛擬時間並執行到期回呼（優先使用）/ advance + run (preferred)
+	 * @see run - 只執行到期回呼（不推進時間）/ run only
+	 *
 	 * @param callback - 每次間隔到期時執行的回呼函式 / Callback to execute each interval
 	 * @param delay - 間隔時間，可為毫秒數或 Duration 物件 / Interval time, can be milliseconds or Duration object
 	 * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
@@ -321,6 +342,9 @@ export class FakeTimer implements ITimer
 	 *
 	 * 同步 API：直接回傳佇列項目，不回傳 Promise。
 	 * Synchronous API: returns the queue item directly (no Promise).
+	 *
+	 * @see start - 推進虛擬時間並執行到期回呼（優先使用）/ advance + run (preferred)
+	 * @see run - 只執行到期回呼（不推進時間）/ run only
 	 *
 	 * @param callback - 要立即執行的回呼函式 / Callback to execute immediately
 	 * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
@@ -342,6 +366,9 @@ export class FakeTimer implements ITimer
 	 *
 	 * 同步 API：直接回傳佇列項目，不回傳 Promise。
 	 * Synchronous API: returns the queue item directly (no Promise).
+	 *
+	 * @see start - 推進虛擬時間並執行到期回呼（優先使用）/ advance + run (preferred)
+	 * @see run - 只執行到期回呼（不推進時間）/ run only
 	 *
 	 * @param callback - 影格觸發時執行的回呼函式 / Callback to execute on the frame
 	 * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
@@ -472,6 +499,12 @@ export class FakeTimer implements ITimer
 	 *
 	 * 佇列為空時 cache.min 為 null，此時無最早時間可跳轉，改用 0（不推進）。
 	 * When the queue is empty, cache.min is null; fall back to 0 (no advance).
+	 *
+	 * 優先使用 / Prefer：
+	 *   絕大多數情況請用 `start()`（= `advance()` + `run()`）。只有在你刻意「只想移動時間、稍後再 `run()`」
+	 *   時，才單獨呼叫 `advance()`。
+	 *   Prefer `start()` (= `advance()` + `run()`) in almost all cases; call `advance()` alone only when you
+	 *   deliberately want to move time without running yet.
 	 *
 	 * @param amount - 推進的時間量，可為毫秒數或 Duration 物件 / Amount of time to advance
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
@@ -748,6 +781,8 @@ export class FakeTimer implements ITimer
 	 * 以同步方式呼叫每個回呼（若回呼回傳 Promise 則不等待其完成）。
 	 * Invokes each callback synchronously (does not wait for any returned Promise).
 	 *
+	 * @see start - 若想「推進時間 + 執行」一次完成，請改用 start() / use start() to advance + run at once
+	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
 	run = (): this =>
@@ -958,6 +993,18 @@ export class FakeTimer implements ITimer
 	 * item, so the remaining timers keep their relative order and can resume later from where
 	 * we left off.
 	 *
+	 * 使用時機 / When to use：
+	 *   僅在 run / start / runAsync / startAsync 執行回呼「期間」有意義；run 之外呼叫為 no-op。
+	 *   適用於「想在回呼內中斷本輪、保留剩餘計時器、稍後再從中斷處續跑」的特殊需求。
+	 *   Only meaningful WHILE a run is executing callbacks; a no-op otherwise. Use it when you need
+	 *   to halt the current run from inside a callback yet keep the remaining timers to resume later.
+	 *
+	 * 優先使用 / Prefer：
+	 *   一般推進與執行請用 `start()` / `run()`；若只是想移除某些計時器，請用 `clear*`（`clear` 主 API）。
+	 *   `pause()` 僅供回呼內「中斷並保留進度」之用，不應作為常規流程。
+	 *   For ordinary advance+run use `start()` / `run()`; to drop timers use `clear*` (`clear` is a
+	 *   main API). `pause()` is only for halting-from-callback while preserving progress.
+	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
 	pause = (): this =>
@@ -1012,6 +1059,18 @@ export class FakeTimer implements ITimer
 	 *
 	 * 佇列中的計時器保持不變（僅不再執行本輪剩餘項目）。
 	 * Timers in the queue are left unchanged (only the rest of this run is aborted).
+	 *
+	 * 使用時機 / When to use：
+	 *   僅在 run / start / runAsync / startAsync 執行回呼「期間」有意義；run 之外呼叫為 no-op。
+	 *   適用於「想放棄本輪剩餘項目，並把虛擬時間撤銷回 run 開始前」的場景（如測試中斷言失敗後還原）。
+	 *   Only meaningful WHILE a run is executing callbacks; a no-op otherwise. Use it to abandon the
+	 *   rest of a run and roll the virtual clock back to its pre-run value.
+	 *
+	 * 優先使用 / Prefer：
+	 *   一般推進與執行請用 `start()` / `run()`；若只是想移除計時器，請用 `clear*`（`clear` 主 API）。
+	 *   `cancel()` 僅供回呼內「撤銷本次 run 的時間跳躍」，不應作為常規流程。
+	 *   For ordinary advance+run use `start()` / `run()`; to drop timers use `clear*`. `cancel()` only
+	 *   undoes the run's time jump from within a callback.
 	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
@@ -1068,6 +1127,22 @@ let _globalClockInstalled: (() => void) | undefined;
 /** 預設的全域「會掛載全域時鐘」Timer 實例 / Default global Timer instance that also patches the global clock */
 let globalFakeTimer: UnsafeGlobalFakeTimer;
 
+/**
+ * 取得全域時鐘變體（UnsafeGlobalFakeTimer）的惰性單例。
+ * Get the lazy singleton of the global-clock variant (UnsafeGlobalFakeTimer).
+ *
+ * 使用時機 / When to use：
+ *   需要一個「會替換全域 Date.now / performance.now」的 Timer 實例時，用本函式取得共享單例，
+ *   避免重複 `new` 出多個互不配對的安裝實例。
+ *   When you need a Timer that patches the global clock — use this shared singleton instead of
+ *   `new UnsafeGlobalFakeTimer()` repeatedly.
+ *
+ * 優先使用 / Prefer：
+ *   絕大多數場景請用純 `FakeTimer`；只有待測程式依賴真實全域時鐘、且你已準備好配對
+ *   `uninstallGlobalClock()` 還原時，才使用本函式。
+ *   Prefer the plain `FakeTimer` in almost all cases; reach for this only when driving code that
+ *   depends on the real global clock and you are prepared to restore it.
+ */
 export function getUnsafeGlobalFakeTimer()
 {
 	return globalFakeTimer ??= new UnsafeGlobalFakeTimer();
@@ -1144,8 +1219,16 @@ export class UnsafeGlobalFakeTimer extends FakeTimer
 	 * by THIS instance or globally (possibly by another instance).
 	 *
 	 * - 'none'   : 未安裝 / not installed
-	 * - 'this'   : 由本實例安裝 / installed by this instance
+	 * - 'self'   : 由本實例安裝 / installed by this instance
 	 * - 'global' : 已由某實例安裝（可能是其它實例）/ installed globally (possibly by another instance)
+	 *
+	 * 使用時機 / When to use：
+	 *   診斷目前全域時鐘安裝狀態，特別是跨實例安裝、需要確認「是否已有人安裝」時。
+	 *   Diagnose the global-clock state, e.g. when multiple instances may install.
+	 *
+	 * 優先使用 / Prefer：
+	 *   這是診斷 / 除錯用途，不影響排程；正常的排程與推進請用 `set*` / `start`，不要用它來控制時間流程。
+	 *   Diagnostic only — it does not affect scheduling. Use `set*` / `start` for the actual flow.
 	 */
 	globalClockState(): EnumGlobalClockState
 	{
@@ -1164,6 +1247,17 @@ export class UnsafeGlobalFakeTimer extends FakeTimer
 	 * 警告：此為「全域副作用」，會影響整個處理程序。請務必配對呼叫 uninstallGlobalClock() 還原。
 	 * WARNING: this is a GLOBAL side-effect affecting the whole process. Always pair it with
 	 * uninstallGlobalClock() to restore.
+	 *
+	 * 使用時機 / When to use：
+	 *   僅當待測程式「直接」讀取 `Date.now()` / `performance.now()`（而非接收時間參數）時才需要。
+	 *   Only when the code under test reads `Date.now()` / `performance.now()` DIRECTLY.
+	 *
+	 * 優先使用 / Prefer：
+	 *   若待測程式接受時間參數、或使用本庫的 `set*` / `start`，請用純 `FakeTimer`（不污染源端全域狀態）。
+	 *   本方法是「不安全」的全域副作用，請在測試結尾（或 `finally`）一律配對 `uninstallGlobalClock()` 還原。
+	 *   Prefer the plain `FakeTimer` (no global pollution) whenever the code accepts time params or uses
+	 *   this library's `set*` / `start`. This method is an UNSAFE global side-effect — always pair it
+	 *   with `uninstallGlobalClock()` at the end (or in `finally`).
 	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
@@ -1209,6 +1303,14 @@ export class UnsafeGlobalFakeTimer extends FakeTimer
 	 * 若全域已註冊，則委託給真正安裝的實例執行還原；否則由本實例自行還原。
 	 * If a global registration exists, delegate the restore to the instance that actually
 	 * installed it; otherwise restore directly.
+	 *
+	 * 使用時機 / When to use：
+	 *   在測試結束、或任何 `installGlobalClock()` 之後，還原被替換的全域 `Date.now` / `performance.now`。
+	 *   After `installGlobalClock()` (or at test teardown) to restore the patched globals.
+	 *
+	 * 優先使用 / Prefer：
+	 *   每次 `installGlobalClock()` 都「必須」配對呼叫本方法；跨實例亦安全（會委託給真正安裝的實例）。
+	 *   Every `installGlobalClock()` MUST be paired with this call; it is cross-instance safe.
 	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */

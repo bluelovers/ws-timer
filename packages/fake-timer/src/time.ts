@@ -40,12 +40,12 @@ export interface ITimeDataCore
  */
 export class TimeCore
 {
-	/** 時間狀態資料 / Time state data */
+	/** 時間狀態資料（內部）；含 real_init / fake_init / fake_now / fake_old 等；避免直接操作，請用 FakeTimer 公開 API。 / Time state data (internal): real_init / fake_init / fake_now / fake_old etc.; avoid direct access — use FakeTimer's public API. */
 	public data = {} as ITimeDataCore;
 
 	/**
-	 * 建立 Time 實例
-	 * Create a Time instance
+	 * 建立 Time 實例（內部；公開請用 `new FakeTimer()`）。
+	 * Create a Time instance (internal; prefer `new FakeTimer()` publicly).
 	 *
 	 * @param options - 時間配置選項，可為 ITimeData 物件或直接傳入日期值 / Time config options, can be ITimeData object or a date value directly
 	 */
@@ -79,8 +79,8 @@ export class TimeCore
 	}
 
 	/**
-	 * 子類初始化鉤子（dayjs 為 immutable，無需 clone）
-	 * Subclass initialization hook (dayjs is immutable, no clone needed)
+	 * 子類初始化鉤子（內部；dayjs 為 immutable，無需 clone）
+	 * Subclass initialization hook (internal; dayjs is immutable, no clone needed)
 	 */
 	_init()
 	{
@@ -88,8 +88,8 @@ export class TimeCore
 	}
 
 	/**
-	 * 工廠方法，建立 Time 實例
-	 * Factory method to create a Time instance
+	 * 工廠方法（內部）；公開請用 `new FakeTimer()`。
+	 * Factory method (internal); prefer `new FakeTimer()` publicly.
 	 */
 	static new(options?: ITimeDataCore)
 	{
@@ -99,8 +99,8 @@ export class TimeCore
 	}
 
 	/**
-	 * 取得當前類別的建構函式（用於 static 方法中引用子類）
-	 * Get the constructor of the current class (used in static methods to reference subclasses)
+	 * 取得當前類別的建構函式（內部；用於 static 方法中引用子類）
+	 * Get the constructor of the current class (internal; used in static methods to reference subclasses)
 	 */
 	get static()
 	{
@@ -109,8 +109,11 @@ export class TimeCore
 	}
 
 	/**
-	 * 驗證傳入值是否為有效的日期表示
-	 * Validate whether the passed value is a valid date representation
+	 * 驗證傳入值是否為有效的日期表示（內部輔助）
+	 * Validate whether the passed value is a valid date representation (internal helper)
+	 *
+	 * 公開不需要直接使用。
+	 * Not needed publicly.
 	 *
 	 * 支援的型別：dayjs.Dayjs、Date、數字（時間戳）、可解析的日期字串
 	 * Supported types: dayjs.Dayjs, Date, number (timestamp), parseable date string
@@ -143,6 +146,11 @@ export class TimeCore
 	 * - 物件（Date 等）→ 直接設定為該時間 / Object (Date etc.) → set to that time
 	 * - 數字 + unit → 加算指定單位 / Number + unit → add specified unit
 	 * - 純數字 → 預設加算 100 毫秒 / Number alone → add 100ms by default
+	 *
+	 * 內部方法 / Internal method：公開推進虛擬時間請改用 FakeTimer.advance() / start()；
+	 * 直接呼叫會繞過 time-jump 防護與快取不變式。
+	 * Internal: prefer FakeTimer.advance() / start() to advance time; calling this directly
+	 * bypasses the time-jump guard and cache invariants.
 	 */
 	update(amount: any = 100, unit?: dayjs.ManipulateType)
 	{
@@ -170,8 +178,11 @@ export class TimeCore
 	}
 
 	/**
-	 * 取得或遞增識別碼
-	 * Get or increment the identifier
+	 * 取得或遞增識別碼（內部計數器）
+	 * Get or increment the identifier (internal counter)
+	 *
+	 * 公開識別計時器請用佇列項目的 id / name，或 FakeTimer.clear* 的 ITimerHandle。
+	 * To identify timers publicly, use the item's id / name or the ITimerHandle of FakeTimer.clear*.
 	 *
 	 * @param bool - 若為 true 則僅回傳當前值不遞增，若為 false 或省略則回傳後遞增 / If true returns current value without increment, otherwise returns and increments
 	 */
@@ -181,8 +192,13 @@ export class TimeCore
 	}
 
 	/**
-	 * 取得當前虛擬時間
-	 * Get the current fake time
+	 * 取得當前虛擬時間（dayjs.Dayjs，非數值）。
+	 * Get the current virtual time (dayjs.Dayjs, NOT a number).
+	 *
+	 * 這是 FakeTimer 回呼內 `self.timer.now()` 讀取的時鐘；計算「自建立以來經過的毫秒數」
+	 * 請用 `now().diff(fake_init)`（或 FakeTimer.initTime）。
+	 * This is the clock read via `self.timer.now()` inside callbacks. To compute elapsed ms
+	 * since creation, use `now().diff(fake_init)` (or FakeTimer.initTime).
 	 */
 	now(): dayjs.Dayjs
 	{
@@ -195,6 +211,9 @@ export class TimeCore
 	 *
 	 * 不影響 real_init（建立實例時捕捉的真實時間）。
 	 * Does not affect real_init (the real time captured at instance creation).
+	 *
+	 * 內部方法 / Internal method：公開請改用 FakeTimer.reset()。
+	 * Internal: prefer FakeTimer.reset().
 	 *
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
