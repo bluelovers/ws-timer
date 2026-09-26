@@ -154,8 +154,13 @@ export interface ICallback extends Function
 	 * （`this` 永遠是 `current` 佇列項目本身）。
 	 * To reach the queue or the virtual clock, use `self.timer`; do not rely on `this`
 	 * inside the callback (`this` is always the `current` queue item).
+	 *
+	 * `...params` 是呼叫 `setTimeout(func, delay, ...params)` 時傳入的額外引數，
+	 * 觸發時會原樣轉交給回呼（對齊 Web/API/Window.setTimeout 用法）。
+	 * `...params` are the extra arguments passed to `setTimeout(func, delay, ...params)`,
+	 * forwarded verbatim to the callback when it fires (aligns with Web/API/Window.setTimeout).
 	 */
-	(current: ITimeQueueItem, self: FakeTimer): void;
+	(current: ITimeQueueItem, self: FakeTimer, ...params: any[]): void;
 }
 
 /**

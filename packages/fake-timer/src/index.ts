@@ -21,9 +21,9 @@ dayjs.extend(duration);
  */
 export interface ITimerFunc extends Function
 {
-	(callback: ICallback, delay: number, ...params: any[]): ITimeQueueItem;
+	(callback: ICallback, delay?: number, ...params: any[]): ITimeQueueItem;
 
-	(callback: ICallback, delay: duration.Duration, ...params: any[]): ITimeQueueItem;
+	(callback: ICallback, delay?: duration.Duration, ...params: any[]): ITimeQueueItem;
 }
 
 /**
@@ -202,8 +202,8 @@ export class FakeTimer implements ITimer
 	{
 		const item = this.timer.add({
 			callback: callback,
-			timing: toDuration(delay),
-			interval: type === EnumTimerType.setInterval ? toDuration(delay) : undefined,
+			timing: toDuration(delay ?? 0),
+			interval: type === EnumTimerType.setInterval ? toDuration(delay ?? 0) : undefined,
 			params: params,
 			type: type,
 		});
@@ -232,7 +232,7 @@ export class FakeTimer implements ITimer
 	 * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
 	 * @returns 新增的佇列項目 / The newly added queue item
 	 */
-	setTimeout = (callback: ICallback, delay: IDurationInput, ...params: any[]): ITimeQueueItem =>
+	setTimeout = (callback: ICallback, delay?: IDurationInput, ...params: any[]): ITimeQueueItem =>
 	{
 		return this._schedule(EnumTimerType.setTimeout, callback, delay, params);
 	};
@@ -250,7 +250,7 @@ export class FakeTimer implements ITimer
 	 * @param params - 傳遞給回呼函式的額外參數 / Additional parameters passed to callback
 	 * @returns 新增的佇列項目 / The newly added queue item
 	 */
-	setInterval = (callback: ICallback, delay: IDurationInput, ...params: any[]): ITimeQueueItem =>
+	setInterval = (callback: ICallback, delay?: IDurationInput, ...params: any[]): ITimeQueueItem =>
 	{
 		return this._schedule(EnumTimerType.setInterval, callback, delay, params);
 	};
@@ -750,7 +750,7 @@ export class FakeTimer implements ITimer
 
 		for (const current of this._gen)
 		{
-			await current.callback(current, this);
+			await current.callback(current, this, ...(current.params ?? []));
 		}
 
 		return this;
@@ -765,7 +765,7 @@ export class FakeTimer implements ITimer
 	{
 		for (const current of this._runCore())
 		{
-			current.callback(current, this);
+			current.callback(current, this, ...(current.params ?? []));
 
 			yield current;
 		}
