@@ -355,9 +355,9 @@ describe('Timer', () =>
 		const t = new Timer();
 		let receivedArgs: any[] = [];
 
-		await t.setImmediate((current, timer) =>
+		await t.setImmediate((current, self) =>
 		{
-			receivedArgs = [current, timer];
+			receivedArgs = [current, self];
 		});
 
 		await t.run();

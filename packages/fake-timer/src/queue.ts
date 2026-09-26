@@ -7,6 +7,7 @@ import duration from 'dayjs/plugin/duration';
 import minMax from 'dayjs/plugin/minMax';
 import { nanoid } from 'nanoid';
 import { TimeCore, type ITimeDataCore } from './time';
+import type { FakeTimer } from './index';
 
 dayjs.extend(duration);
 dayjs.extend(minMax);
@@ -145,7 +146,16 @@ export interface ISetTimeout extends Function
  */
 export interface ICallback extends Function
 {
-	(current: ITimeQueueItem, timer: QueueTimer, self?)
+	/**
+	 * 回呼簽章：第 2 個參數 `self` 即所屬的 FakeTimer 實例。
+	 * Callback signature: the 2nd parameter `self` is the owning FakeTimer instance.
+	 *
+	 * 想拿佇列或虛擬時鐘請走 `self.timer`，不要依賴回呼內的 `this`
+	 * （`this` 永遠是 `current` 佇列項目本身）。
+	 * To reach the queue or the virtual clock, use `self.timer`; do not rely on `this`
+	 * inside the callback (`this` is always the `current` queue item).
+	 */
+	(current: ITimeQueueItem, self: FakeTimer): void;
 }
 
 /**

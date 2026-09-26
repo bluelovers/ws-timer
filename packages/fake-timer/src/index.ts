@@ -750,7 +750,7 @@ export class FakeTimer implements ITimer
 
 		for (const current of this._gen)
 		{
-			await current.callback(current, this.timer);
+			await current.callback(current, this);
 		}
 
 		return this;
@@ -765,7 +765,7 @@ export class FakeTimer implements ITimer
 	{
 		for (const current of this._runCore())
 		{
-			current.callback(current, this.timer);
+			current.callback(current, this);
 
 			yield current;
 		}

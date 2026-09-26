@@ -5,22 +5,31 @@
 import defaultFakeTimer, { setTimeout, setImmediate } from '../src/index';
 import dayjs from 'dayjs';
 
-setTimeout(function (current, timer, self)
+setTimeout(function (current, self)
 {
-	// @ts-ignore
-	console.log(this, current.id);
+	console.log('timer a id', current.id, {
+		selfIsFakeTimer: self === defaultFakeTimer,
+		selfTimerLength: self.timer.length,
+		current,
+	});
 }, 1500);
 
-let q = setTimeout(function (current, timer, self)
+let q = setTimeout(function (current, self)
 {
-	// @ts-ignore
-	console.log(this, current.id, self);
+	console.log('timer b id', current.id, {
+		selfIsFakeTimer: self === defaultFakeTimer,
+		selfTimerLength: self.timer.length,
+		current,
+	});
 }, 500);
 
-setImmediate(function (current, timer, self)
+setImmediate(function (current, self)
 {
-	// @ts-ignore
-	console.log(this, current.id, self);
+	console.log('setImmediate id', current.id, {
+		selfIsFakeTimer: self === defaultFakeTimer,
+		selfTimerNow: self.timer.now().valueOf(),
+		current,
+	});
 });
 
 defaultFakeTimer.startAsync(-1)
