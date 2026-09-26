@@ -4,6 +4,7 @@
 
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
+import { isValidDate } from './util';
 
 dayjs.extend(duration);
 
@@ -57,7 +58,7 @@ export class TimeCore
 		 * 若 options 為有效日期值，則將其視為 now，options 清空
 		 * If options is a valid date value, treat it as now and clear options
 		 */
-		if (this.static.isValidDate(options))
+		if (isValidDate(options))
 		{
 			[options, now] = [{}, options];
 		}
@@ -98,43 +99,7 @@ export class TimeCore
 		return t;
 	}
 
-	/**
-	 * 取得當前類別的建構函式（內部；用於 static 方法中引用子類）
-	 * Get the constructor of the current class (internal; used in static methods to reference subclasses)
-	 */
-	get static()
-	{
-		// @ts-ignore
-		return this.__proto__.constructor;
-	}
 
-	/**
-	 * 驗證傳入值是否為有效的日期表示（內部輔助）
-	 * Validate whether the passed value is a valid date representation (internal helper)
-	 *
-	 * 公開不需要直接使用。
-	 * Not needed publicly.
-	 *
-	 * 支援的型別：dayjs.Dayjs、Date、數字（時間戳）、可解析的日期字串
-	 * Supported types: dayjs.Dayjs, Date, number (timestamp), parseable date string
-	 */
-	static isValidDate(who)
-	{
-		if (dayjs.isDayjs(who) || who instanceof Date)
-		{
-			return true;
-		}
-		else if (typeof who == 'number' && dayjs(who).isValid())
-		{
-			return true;
-		}
-		else if (Date.parse(who))
-		{
-			return true;
-		}
-
-		return false;
-	}
 
 	/**
 	 * 推進虛擬時間
@@ -203,6 +168,43 @@ export class TimeCore
 	now(): dayjs.Dayjs
 	{
 		return this.data.virtual_now as dayjs.Dayjs;
+	}
+
+	/**
+	 * 虛擬時鐘的初始時間（t=0 基準），唯讀。
+	 * The initial virtual clock time (t=0 reference), read-only.
+	 *
+	 * `data` 由 TimeCore 持有（虛擬時間的源頭），故這個取值 API 定義在此 class；
+	 * `virtual_init` 即建立實例時捕捉的虛擬時間。
+	 * `data` is owned by TimeCore (the source of virtual time), so this accessor lives here;
+	 * `virtual_init` is the virtual time captured when the instance was created.
+	 *
+	 * 對外：FakeTimer 透過委派 `timer.initTime` 暴露同一值，請優先用它而非直接讀 `data.virtual_init`。
+	 * Externally: FakeTimer exposes the same value by delegating to `timer.initTime`; prefer that over reading `data.virtual_init`.
+	 *
+	 * @see now
+	 */
+	public get initTime(): dayjs.Dayjs
+	{
+		return this.data.virtual_init as dayjs.Dayjs;
+	}
+
+	/**
+	 * 自建立以來經過的「虛擬」毫秒數（number，非 dayjs）。
+	 * Elapsed VIRTUAL milliseconds since creation (number, not dayjs).
+	 *
+	 * 等價於 `now().diff(initTime)`，但省去自行取 clock 再相減；實作同樣位於 TimeCore（持有 data 與 now）。
+	 * Equivalent to `now().diff(initTime)` without reaching for the clock; implemented here on TimeCore too (owns data and now).
+	 *
+	 * 注意 / Note：這是「虛擬時間」的經過量，不是真實牆鐘。
+	 * This is the elapsed VIRTUAL time, not the real wall-clock.
+	 *
+	 * @see initTime
+	 * @see now
+	 */
+	public get elapsedMilliseconds(): number
+	{
+		return this.now().diff(this.initTime);
 	}
 
 	/**

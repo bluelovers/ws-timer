@@ -10,7 +10,7 @@ import duration from 'dayjs/plugin/duration';
 
 dayjs.extend(duration);
 
-import { FakeTimer as Timer, defaultFakeTimer as init, setTimeout as fakeSetTimeout, setImmediate as fakeSetImmediate, EnumTimerType } from '../src/index';
+import { FakeTimer as Timer, defaultFakeTimer as init, setTimeout as fakeSetTimeout, setImmediate as fakeSetImmediate, EnumTimerType, isValidDate } from '../src/index';
 import { QueueTimer } from '../src/queue';
 import { TimeCore } from '../src/time';
 
@@ -110,11 +110,11 @@ describe('Time', () =>
 
 	it('isValidDate should validate various inputs', () =>
 	{
-		assert.equal(TimeCore.isValidDate(new Date()), true);
-		assert.equal(TimeCore.isValidDate(Date.now()), true);
-		assert.equal(TimeCore.isValidDate('2020-01-01'), true);
-		assert.equal(TimeCore.isValidDate('not-a-date'), false);
-		assert.equal(TimeCore.isValidDate(null), false);
+		assert.equal(isValidDate(new Date()), true);
+		assert.equal(isValidDate(Date.now()), true);
+		assert.equal(isValidDate('2020-01-01'), true);
+		assert.equal(isValidDate('not-a-date'), false);
+		assert.equal(isValidDate(null), false);
 	});
 });
 

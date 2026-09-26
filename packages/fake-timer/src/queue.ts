@@ -7,6 +7,7 @@ import duration from 'dayjs/plugin/duration';
 import minMax from 'dayjs/plugin/minMax';
 import { nanoid } from 'nanoid';
 import { TimeCore, type ITimeDataCore } from './time';
+import type { EnumTimerType } from './util';
 import type { FakeTimer } from './index';
 
 dayjs.extend(duration);
@@ -14,23 +15,6 @@ dayjs.extend(minMax);
 
 /** 虛擬時間或時間區間的聯合型別 / Union type for virtual time or time duration */
 export type IDayMoment = dayjs.Dayjs | duration.Duration;
-
-/**
- * 計時器種類（鍵值相等，便於直接比較）
- * Timer kinds (keys equal values, convenient for direct comparison)
- *
- * - setTimeout            : 一次性延遲計時器 / one-shot deferred timer
- * - setInterval           : 週期性計時器 / repeating timer
- * - setImmediate          : 立即執行（延遲為 0）/ run immediately (delay 0)
- * - requestAnimationFrame : 每幀執行 / run each animation frame
- */
-export const enum EnumTimerType
-{
-	setTimeout = 'setTimeout',
-	setInterval = 'setInterval',
-	setImmediate = 'setImmediate',
-	requestAnimationFrame = 'requestAnimationFrame',
-}
 
 /**
  * 計時器控制代號（單一真理來源）

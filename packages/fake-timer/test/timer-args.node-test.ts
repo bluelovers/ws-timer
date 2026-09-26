@@ -299,3 +299,43 @@ describe('initTime (public accessor for the initial virtual clock)', () =>
 		assert.equal(t.timer.now().valueOf(), init + 1500);
 	});
 });
+
+describe('elapsedMilliseconds (elapsed virtual time as a number)', () =>
+{
+	it('starts at 0 before any time advance', () =>
+	{
+		const t = new Timer();
+
+		assert.equal(t.elapsedMilliseconds, 0);
+	});
+
+	it('equals now().diff(initTime)', () =>
+	{
+		const t = new Timer();
+
+		t.start(1234);
+
+		assert.equal(t.elapsedMilliseconds, t.timer.now().diff(t.initTime));
+		assert.equal(t.elapsedMilliseconds, 1234);
+	});
+
+	it('is a plain number, not a dayjs', () =>
+	{
+		const t = new Timer();
+
+		t.advance(500);
+
+		assert.equal(typeof t.elapsedMilliseconds, 'number');
+		assert.equal(t.elapsedMilliseconds, 500);
+	});
+
+	it('accumulates across multiple advances', () =>
+	{
+		const t = new Timer();
+
+		t.start(100);
+		t.start(250);
+
+		assert.equal(t.elapsedMilliseconds, 350);
+	});
+});

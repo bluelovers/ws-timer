@@ -4,13 +4,15 @@
 
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
-import { QueueTimer, EnumTimerType } from './queue';
+import { QueueTimer } from './queue';
 import type { ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData, ITimerHandle, IDurationInput, IRemovedTimer } from './queue';
 import { TimeCore } from './time';
+import { EnumTimerType, toDuration, normalizeDelay, isValidDate } from './util';
+
+export * from './util';
 
 export { QueueTimer };
 export { TimeCore };
-export { EnumTimerType };
 export { ITimerHandle, IDurationInput, IRemovedTimer };
 
 dayjs.extend(duration);
@@ -53,6 +55,9 @@ export interface ITimer
 	/** 取得虛擬時鐘的初始時間（t=0 基準），不必操作底層 `timer.data` / Get the initial virtual clock time (t=0 reference), without touching the underlying `timer.data` */
 	readonly initTime: dayjs.Dayjs;
 
+	/** 自建立以來經過的虛擬毫秒數（純數字，非 dayjs）/ Elapsed virtual milliseconds since creation (plain number, not dayjs) */
+	readonly elapsedMilliseconds: number;
+
 	/** 推進虛擬時間（同步，不執行回呼）/ Advance virtual time (synchronous, does not run callbacks) */
 	advance(amount?: IDurationInput): this;
 
@@ -88,59 +93,6 @@ export interface ITimer
 
 	/** 模擬 cancelAnimationFrame：取消尚未觸發的 rAF 項目 / Simulate cancelAnimationFrame: cancel a pending rAF item */
 	cancelAnimationFrame(handle?: ITimerHandle): IRemovedTimer;
-}
-
-/**
- * 將數值或 Duration 轉換為 Duration 型別
- * Converts a number or Duration to a Duration type
- *
- * 若輸入已是 Duration，則直接回傳；否則以數值建立 Duration（單位為毫秒）
- * If input is already a Duration, return it directly; otherwise create a Duration from the number (in milliseconds)
- */
-export function toDuration(value: IDurationInput): duration.Duration
-{
-	return dayjs.isDuration(value) ? value : dayjs.duration(value);
-}
-
-/**
- * 驗證並正規化 delay，對齊標準 Web API 的處理方式（集中複用，不在各呼叫點重複寫死）。
- * Validate and normalize a delay, aligning with the standard Web API (shared/reusable, not inlined).
- *
- * 規則 / Rules:
- * - `undefined` / `null` → `0`（對齊 `setTimeout(func)` 省略 delay）。
- * - 數值非有限（Infinity / -Infinity / NaN）→ 拋 `RangeError`（避免產生失控計時器）。
- * - `dayjs.Duration` 解析後非有限（dayjs.duration(NaN) / dayjs.duration(Infinity)）→ 拋 `RangeError`。
- * - 負數 delay → 箝成 `0`（標準 Web API：timeout < 0 視為 0）。
- *
- * @returns 有限且有效的 delay（number | duration.Duration）
- */
-export function normalizeDelay(delay: IDurationInput | null | undefined): IDurationInput
-{
-	const value = delay ?? 0;
-
-	if (typeof value === 'number')
-	{
-		if (!Number.isFinite(value))
-		{
-			throw new RangeError(
-				`fake-timer: delay must be a finite number; received ${String(delay)} ` +
-				`(Infinity / -Infinity / NaN are not allowed — they create uncontrolled timers).`,
-			);
-		}
-
-		return value < 0 ? 0 : value;
-	}
-
-	// value 為 dayjs.Duration
-	if (!Number.isFinite(value.asMilliseconds()))
-	{
-		throw new RangeError(
-			`fake-timer: delay Duration must resolve to a finite number of milliseconds; received ${String(delay)} ` +
-			`(dayjs.duration(NaN) / dayjs.duration(Infinity) are not allowed).`,
-		);
-	}
-
-	return value.asMilliseconds() < 0 ? 0 : value;
 }
 
 /**
@@ -189,14 +141,45 @@ export class FakeTimer implements ITimer
 	 * 使用時機 / When to use：
 	 *   需要「自建立以來經過的毫秒數」時：`self.timer.now().diff(self.initTime)`。
 	 *   Use it to compute elapsed virtual time since creation: `self.timer.now().diff(self.initTime)`.
+	 *   若只要純數字經過量、不想自己相減，請改用 `elapsedMilliseconds`（等同 `now().diff(initTime)`）。
+	 *   If you only need the elapsed amount as a plain number, prefer `elapsedMilliseconds` (equals `now().diff(initTime)`).
 	 *
 	 * 優先使用 / Prefer：
 	 *   請用 `initTime` 取代直接讀取底層 `timer.data.virtual_init` —— 這是公開取值 API，不必操作內部 `data`。
 	 *   Prefer `initTime` over reaching into the internal `timer.data.virtual_init`; this is the public accessor.
+	 *
+	 * 委派 / Delegation：本 getter 委派給 `timer.initTime`；`data` 與其取值邏輯實際位於 TimeCore（data 的持有者）。
+	 * Delegation: this getter delegates to `timer.initTime`; `data` and its access logic actually live on TimeCore (the owner of `data`).
 	 */
 	public get initTime(): dayjs.Dayjs
 	{
-		return this.timer.data.virtual_init as dayjs.Dayjs;
+		return this.timer.initTime;
+	}
+
+	/**
+	 * 自建立以來經過的「虛擬」毫秒數（number，非 dayjs）。
+	 * Elapsed VIRTUAL milliseconds since creation (number, not dayjs).
+	 *
+	 * 等價於 `timer.now().diff(initTime)`，但省去自行取 clock 再相減。
+	 * Equivalent to `timer.now().diff(initTime)` without reaching for the clock yourself.
+	 *
+	 * 使用時機 / When to use：
+	 *   需要「從基準到現在過了多久（虛擬）」的純數字時，用它取代 `timer.now().diff(initTime)`。
+	 *   Use it when you need the elapsed virtual time as a plain number instead of `timer.now().diff(initTime)`.
+	 *
+	 * 注意 / Note：
+	 *   這是「虛擬時間」的經過量，不是真實牆鐘；要絕對虛擬時間請用 `timer.now()`。
+	 *   This is the elapsed VIRTUAL time, not the real wall-clock; for the absolute virtual time use `timer.now()`.
+	 *
+	 * 委派 / Delegation：本 getter 委派給 `timer.elapsedMilliseconds`（實作位於 TimeCore）。
+	 * Delegation: this getter delegates to `timer.elapsedMilliseconds` (implemented on TimeCore).
+	 *
+	 * @see initTime
+	 * @see Timer.now
+	 */
+	public get elapsedMilliseconds(): number
+	{
+		return this.timer.elapsedMilliseconds;
 	}
 
 	/**

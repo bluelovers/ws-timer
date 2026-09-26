@@ -45,7 +45,16 @@ console.log(clock.globalClockState());
 - `initTime: dayjs.Dayjs`（getter）
   虛擬時鐘的初始時間（t=0 基準）。等於 `timer.data.virtual_init`，但為**公開**取值，不必操作底層 `data`。
   Public accessor for the initial virtual clock; equals `timer.data.virtual_init` without reaching into internals.
+  - 實作位於 TimeCore（data 的持有者），FakeTimer 對外委派同一值。
+  - Implemented on TimeCore (the owner of `data`); FakeTimer delegates the same value outward.
   - 用途 / Use：`timer.now().diff(self.initTime)` 取得「自建立以來經過的毫秒數」。
+
+- `elapsedMilliseconds: number`（getter）
+   自建立以來經過的「虛擬」毫秒數（純數字，非 dayjs）。等價於 `timer.now().diff(initTime)`，但省去自行計算。
+   Plain-number elapsed VIRTUAL milliseconds since creation (not dayjs). Equivalent to `timer.now().diff(initTime)` without manual subtraction.
+   - 實作同樣位於 TimeCore；FakeTimer 委派。/ Also implemented on TimeCore; FakeTimer delegates.
+   - 用途 / Use：需要「過了多久」的 number 時直接讀它；注意是虛擬時間，不是真實牆鐘。
+   - 對應值同 `performance.now()`（於 `installGlobalClock()` 之後）。
 
 - `frameInterval: dayjs.Duration`
   `requestAnimationFrame` 的每影格間隔，預設 `1000/60` ms（約 60fps）。可直接覆寫以模擬不同刷新率。
