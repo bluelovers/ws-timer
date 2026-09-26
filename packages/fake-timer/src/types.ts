@@ -122,6 +122,15 @@ export interface ITimeData extends ITimeDataCore
 {
 	/** 自訂排序函式 / Custom sort function */
 	sort?: ISortCallback;
+
+	/**
+	 * 安全延遲下限（毫秒）：當正規化後的 delay 為 0（含 undefined / null / 負數 / Duration(0)）時，
+	 * 改用此值作為最小延遲。必須為 > 0 的有限數值；未設定時預設 1/10 秒（100ms，見 DEFAULT_MIN_DELAY）。
+	 * Minimum safe delay (ms): when the normalized delay would be 0 (incl. undefined / null / negative /
+	 * Duration(0)), use this value as the minimum delay. Must be a finite number > 0; defaults to
+	 * 1/10 s (100ms, see DEFAULT_MIN_DELAY) when not set.
+	 */
+	safeMinDelay?: number;
 }
 
 /**

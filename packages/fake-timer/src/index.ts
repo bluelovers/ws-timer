@@ -5,7 +5,7 @@
 import { dayjs, duration } from './dayjs';
 import { QueueTimer } from './queue';
 import { TimeCore } from './time';
-import { EnumTimerType, compareQueueItemIdAsc, normalizeDelay, toDuration } from './util';
+import { EnumTimerType, compareQueueItemIdAsc, normalizeDelay, normalizeDelaySafe, toDuration } from './util';
 import { ICallback, IDurationInput, IRemovedTimer, ITimeData, ITimeQueueItem, ITimer, ITimerHandle } from './types';
 
 export type * from './types';
@@ -125,34 +125,61 @@ export class FakeTimer implements ITimer
 		tryAdd(item: ITimeQueueItem): void;
 	} | null = null;
 
-	/** 目前活躍 run 的快取生成器：run / runAsync / runGenerator 共用同一份狀態。
-	 * Cached generator of the active run: run / runAsync / runGenerator share one state. */
+	/**
+	 * 目前活躍 run 的快取生成器：run / runAsync / runGenerator 共用同一份狀態。
+	 * Cached generator of the active run: run / runAsync / runGenerator share one state.
+	 */
 	protected _gen: Generator<ITimeQueueItem, void, void> | null = null;
 
-	/** 本次 run 開始前的虛擬時間（供 cancel / pause 修正時間使用）。
-	 * Virtual time before this run started (used by cancel / pause to correct time). */
+	/**
+	 * 本次 run 開始前的虛擬時間（供 cancel / pause 修正時間使用）。
+	 * Virtual time before this run started (used by cancel / pause to correct time).
+	 */
 	protected _runStartNow: dayjs.Dayjs | null = null;
 
-	/** 目前正被執行的佇列項目（供 pause / cancel 中斷時移除已觸發的項目）。
-	 * The queue item currently being executed (used by pause / cancel to remove the already-fired item). */
+	/**
+	 * 目前正被執行的佇列項目（供 pause / cancel 中斷時移除已觸發的項目）。
+	 * The queue item currently being executed (used by pause / cancel to remove the already-fired item).
+	 */
 	protected _current: ITimeQueueItem | null = null;
 
-	/** 中斷旗標：pause / cancel 在回呼內設定，_runCore 於每次 yield 後檢查並結束本輪 run。
+	/**
+	 * 中斷旗標：pause / cancel 在回呼內設定，_runCore 於每次 yield 後檢查並結束本輪 run。
 	 * 使用旗標而非 generator.return()，是因為回呼可能在自動觸發回呼的生成器內執行，
 	 * 此時直接 return() 會拋出「Generator is already running」。
 	 * Abort flag: set by pause / cancel inside a callback; _runCore checks it after each yield to
 	 * end the run. A flag (not generator.return()) is used because the callback may run INSIDE a
-	 * generator that auto-invokes callbacks, where return() would throw "Generator is already running". */
+	 * generator that auto-invokes callbacks, where return() would throw "Generator is already running".
+	 */
 	protected _abort = false;
+
+	/**
+	 * 安全延遲下限（毫秒）：所有「視為 0」的 delay 都至少間隔此值。未設定時為 undefined，
+	 *  由 normalizeDelaySafe 本身控管預設值（目前 1/10 秒，見 util 的 DEFAULT_MIN_DELAY）。
+	 *  Minimum safe delay (ms): any delay treated as 0 waits at least this long. When unset (undefined),
+	 *  the default is owned by normalizeDelaySafe itself (currently 1/10 s, see DEFAULT_MIN_DELAY in util).
+	 */
+	protected safeMinDelay?: number;
 
 	/**
 	 * 建立 Timer 實例
 	 * Create a Timer instance
 	 *
-	 * @param options - 時間配置選項 / Time configuration options
+	 * @param options - 時間配置選項；可透過 safeMinDelay 設定最小安全延遲（必須 > 0）
 	 */
 	constructor(options?: ITimeData)
 	{
+		const min = options?.safeMinDelay;
+		if (min !== undefined && (!Number.isFinite(min) || min <= 0))
+		{
+			throw new RangeError(
+				`fake-timer: safeMinDelay must be a finite number > 0; received ${String(min)}.`,
+			);
+		}
+
+		// 不在此指定預設值：未設定（undefined）時由 normalizeDelaySafe 自己套用預設下限。
+		// Do not set a default here: when unset (undefined), normalizeDelaySafe applies its own default floor.
+		this.safeMinDelay = min;
 		this.timer = QueueTimer.new(options);
 	}
 
@@ -173,7 +200,13 @@ export class FakeTimer implements ITimer
 	 */
 	protected _schedule(type: EnumTimerType, callback: ICallback, delay: IDurationInput, params: any[]): ITimeQueueItem
 	{
-		const validatedDelay = normalizeDelay(delay);
+		// setImmediate 依設計即為「立即觸發」（delay 0），不套用安全下限；
+		// 其餘類型一律改用安全版 normalizeDelaySafe，使「視為 0」的 delay 至少間隔 safeMinDelay。
+		// setImmediate is by design "fire immediately" (delay 0) and is exempt from the safe floor;
+		// all other types use normalizeDelaySafe so any delay treated as 0 waits at least safeMinDelay.
+		const validatedDelay = type === EnumTimerType.setImmediate
+			? normalizeDelay(delay)
+			: normalizeDelaySafe(delay, this.safeMinDelay);
 
 		const timing = toDuration(validatedDelay);
 
@@ -1317,6 +1350,7 @@ if (process.env.TSDX_FORMAT !== 'esm')
 
 	Object.defineProperty(defaultFakeTimer, "toDuration", { value: toDuration });
 	Object.defineProperty(defaultFakeTimer, "normalizeDelay", { value: normalizeDelay });
+	Object.defineProperty(defaultFakeTimer, "normalizeDelaySafe", { value: normalizeDelaySafe });
 
 	Object.defineProperty(defaultFakeTimer, "setTimeout", { value: setTimeout });
 	Object.defineProperty(defaultFakeTimer, "setInterval", { value: setInterval });

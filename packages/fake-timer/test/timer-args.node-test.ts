@@ -13,7 +13,7 @@ import { DEFAULT_MIN_DELAY, normalizeDelay, normalizeDelaySafe } from '../src/ut
 
 describe('Timer args — Web/API/Window.setTimeout compatibility', () =>
 {
-	it('setTimeout(func) with no delay defaults to 0ms and fires', () =>
+	it('setTimeout(func) with no delay uses the default safe minimum (100ms)', () =>
 	{
 		const t = new Timer();
 		let fired = false;
@@ -23,8 +23,12 @@ describe('Timer args — Web/API/Window.setTimeout compatibility', () =>
 			fired = true;
 		});
 
+		// 無 delay 視為 0，經安全版正規化後至少間隔預設 safeMinDelay（100ms），不會立即觸發
+		// No delay is treated as 0; after safe normalization it waits at least the default safeMinDelay (100ms), not immediately
 		t.start(0);
+		assert.equal(fired, false);
 
+		t.start(100);
 		assert.equal(fired, true);
 	});
 
@@ -168,15 +172,17 @@ describe('Timer args — Web/API/Window.setTimeout compatibility', () =>
 		assert.throws(() => t.setTimeout(() => {}, dayjs.duration(Infinity)), RangeError);
 	});
 
-	it('negative delay still fires immediately (standard-aligned, not rejected)', () =>
+	it('negative delay uses the default safe minimum (100ms) instead of firing immediately', () =>
 	{
 		const t = new Timer();
 		let fired = 0;
 
-		t.setTimeout(() => { fired++; }, -5); // 標準 API 把負數視為 0 → 立即觸發
+		t.setTimeout(() => { fired++; }, -5); // 安全版：負數箝成安全下限 100ms，而非視為 0 立即觸發
 
 		t.start(0);
+		assert.equal(fired, 0);
 
+		t.start(100);
 		assert.equal(fired, 1);
 	});
 
