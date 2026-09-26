@@ -2,16 +2,11 @@
  * Created by user on 2017/11/10/010.
  */
 
-import dayjs from 'dayjs';
-import duration from 'dayjs/plugin/duration';
-import minMax from 'dayjs/plugin/minMax';
+import { dayjs, duration } from './dayjs';
 import { nanoid } from 'nanoid';
 import { TimeCore, type ITimeDataCore } from './time';
 import type { EnumTimerType } from './util';
 import type { FakeTimer } from './index';
-
-dayjs.extend(duration);
-dayjs.extend(minMax);
 
 /** 虛擬時間或時間區間的聯合型別 / Union type for virtual time or time duration */
 export type IDayMoment = dayjs.Dayjs | duration.Duration;

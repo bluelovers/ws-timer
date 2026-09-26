@@ -3,11 +3,8 @@
  * Shared utility functions (pure, side-effect-free) used by TimeCore / QueueTimer / FakeTimer to avoid duplication.
  */
 
-import dayjs from 'dayjs';
-import duration from 'dayjs/plugin/duration';
+import { dayjs, duration } from './dayjs';
 import type { IDurationInput } from './queue';
-
-dayjs.extend(duration);
 
 /**
  * 計時器種類（鍵值相等，便於直接比較）

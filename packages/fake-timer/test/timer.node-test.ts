@@ -5,10 +5,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import dayjs from 'dayjs';
-import duration from 'dayjs/plugin/duration';
-
-dayjs.extend(duration);
+import { dayjs } from '../src/dayjs';
 
 import { FakeTimer as Timer, defaultFakeTimer as init, setTimeout as fakeSetTimeout, setImmediate as fakeSetImmediate, EnumTimerType, isValidDate } from '../src/index';
 import { QueueTimer } from '../src/queue';

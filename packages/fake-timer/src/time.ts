@@ -2,11 +2,8 @@
  * Created by user on 2017/11/10/010.
  */
 
-import dayjs from 'dayjs';
-import duration from 'dayjs/plugin/duration';
+import { dayjs } from './dayjs';
 import { isValidDate } from './util';
-
-dayjs.extend(duration);
 
 /**
  * 時間資料介面，儲存真實時間與虛擬時間的狀態

@@ -2,8 +2,7 @@
  * Created by user on 2017/11/10/010.
  */
 
-import dayjs from 'dayjs';
-import duration from 'dayjs/plugin/duration';
+import { dayjs, duration } from './dayjs';
 import { QueueTimer } from './queue';
 import type { ICallback, ITimeQueueItem, ITimeQueueItemAdd, ITimeData, ITimerHandle, IDurationInput, IRemovedTimer } from './queue';
 import { TimeCore } from './time';
@@ -14,8 +13,6 @@ export * from './util';
 export { QueueTimer };
 export { TimeCore };
 export { ITimerHandle, IDurationInput, IRemovedTimer };
-
-dayjs.extend(duration);
 
 /**
  * 計時器函式介面，支援數值或 Duration 延遲

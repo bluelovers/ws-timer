@@ -7,11 +7,8 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import dayjs from 'dayjs';
-import duration, { Duration } from 'dayjs/plugin/duration';
+import { dayjs, Duration } from '../src/dayjs';
 import { FakeTimer as Timer, normalizeDelay } from '../src/index';
-
-dayjs.extend(duration);
 
 describe('Timer args — Web/API/Window.setTimeout compatibility', () =>
 {
