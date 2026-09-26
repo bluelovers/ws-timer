@@ -92,7 +92,8 @@ setTimeout((current, self, ...rest) => {
 - 第 3 個起的 `...params` 來自 `setTimeout(func, delay, ...args)`，觸發時原樣轉交（對齊 Web/API/Window.setTimeout）；
   `setInterval` 每次重排都沿用同一組 `params`。
 - `current.added` 是**註冊時間**（排程當下的虛擬時間）；`current.timing` 是預計觸發時間（絕對虛擬時間）。
-- 想算「從起始時間到觸發過了多久（虛擬）」：`self.timer.now().diff(self.timer.data.fake_init)`（觸發時 `now()` 即 `current.timing`，差值 = delay）。
+- 想算「從起始時間到觸發過了多久（虛擬）」：`self.timer.now().diff(self.initTime)`（觸發時 `now()` 即 `current.timing`，差值 = delay）。
+  - `self.initTime` 是公開取值 API，等於 `self.timer.data.fake_init`；一般場景請用 `initTime`，不必操作底層 `data`。
   - 例：`setTimeout(cb, 250)` 觸發時 `elapsed = 250`；`setImmediate(cb)` 觸發時 `elapsed = 0`。
 - `current.count` 是**已觸發次數**（每次執行回呼 +1；一次性 timer 固定為 `1`）。週期性 `setInterval` 可讀它判斷目前是第幾次觸發。
   - 例：`setInterval(cb, 50)` 連續觸發時，回呼內 `current.count` 依次為 `1, 2, 3, …`。
@@ -134,7 +135,7 @@ setTimeout(func, delay, param1, /* …, */ paramN);
 ```ts
 const t = new FakeTimer();
 const seen = [];
-t.setInterval(() => seen.push(t.timer.now().diff(t.timer.data.fake_init)), 100);
+t.setInterval(() => seen.push(t.timer.now().diff(t.initTime)), 100);
 t.start(350);
 console.log(seen); // => [350, 350, 350]   （不是 [100, 200, 300]）
 ```

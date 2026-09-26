@@ -50,6 +50,9 @@ export interface ITimer
 	/** 模擬原生 clearImmediate / Simulate native clearImmediate */
 	clearImmediate(handle?: ITimerHandle): IRemovedTimer;
 
+	/** 取得虛擬時鐘的初始時間（t=0 基準），不必操作底層 `timer.data` / Get the initial virtual clock time (t=0 reference), without touching the underlying `timer.data` */
+	readonly initTime: dayjs.Dayjs;
+
 	/** 推進虛擬時間（同步，不執行回呼）/ Advance fake time (synchronous, does not run callbacks) */
 	advance(amount?: IDurationInput): this;
 
@@ -168,6 +171,18 @@ export class FakeTimer implements ITimer
 	 * Defaults to 1000/60 ms (~60fps). Override directly to simulate other refresh rates.
 	 */
 	public frameInterval: duration.Duration = dayjs.duration(1000 / 60);
+
+	/**
+	 * 虛擬時鐘的初始時間（t=0 基準）。
+	 * The initial virtual clock time (t=0 reference).
+	 *
+	 * 對外開放的便捷取值，不必透過底層 `timer.data.fake_init` 操作。
+	 * Public convenience accessor — no need to reach into the underlying `timer.data.fake_init`.
+	 */
+	public get initTime(): dayjs.Dayjs
+	{
+		return this.timer.data.fake_init as dayjs.Dayjs;
+	}
 
 	/**
 	 * 內部 run 狀態（pending 即為內部 API）。

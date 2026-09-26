@@ -269,3 +269,33 @@ describe('normalizeDelay (shared delay validation)', () =>
 		assert.throws(() => normalizeDelay(dayjs.duration(Infinity)), RangeError);
 	});
 });
+
+describe('initTime (public accessor for the initial virtual clock)', () =>
+{
+	it('exposes the initial virtual time as a dayjs, equal to underlying timer.data.fake_init', () =>
+	{
+		const t = new Timer();
+
+		assert.ok(dayjs.isDayjs(t.initTime));
+		assert.equal(t.initTime.valueOf(), (t.timer.data.fake_init as dayjs.Dayjs).valueOf());
+	});
+
+	it('initTime equals now() before any time advance', () =>
+	{
+		const t = new Timer();
+
+		assert.equal(t.initTime.valueOf(), t.timer.now().valueOf());
+	});
+
+	it('initTime stays fixed while the clock advances', () =>
+	{
+		const t = new Timer();
+		const init = t.initTime.valueOf();
+
+		t.start(1000);
+		t.start(500);
+
+		assert.equal(t.initTime.valueOf(), init);
+		assert.equal(t.timer.now().valueOf(), init + 1500);
+	});
+});
