@@ -1,6 +1,6 @@
 {
   "name": "fake-timer",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Fake Timer API for node.js.",
   "keywords": [
     "settimeout",

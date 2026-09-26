@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [3.0.1](https://github.com/bluelovers/ws-timer/compare/fake-timer@3.0.0...fake-timer@3.0.1) (2026-09-26)
+
+
+
+### ♻️　Chores
+
+* **fake-timer:** 將 demo 範例檔案包含在 npm 發佈範圍內 ([a5497ab](https://github.com/bluelovers/ws-timer/commit/a5497ab2c047c161f0332e9e6ce613678f1c1b06))
+
+
+
 # [3.0.0](https://github.com/bluelovers/ws-timer/compare/fake-timer@2.0.2...fake-timer@3.0.0) (2026-09-26)
 
 
