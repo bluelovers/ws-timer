@@ -1,11 +1,80 @@
 'use strict';
 
 var dayjs = require('dayjs');
-var duration = require('dayjs/plugin/duration');
-var minMax = require('dayjs/plugin/minMax');
+require('dayjs/plugin/duration');
+require('dayjs/plugin/minMax');
 var nanoid = require('nanoid');
 
-dayjs.extend(duration);
+let EnumTimerType = /*#__PURE__*/function (EnumTimerType) {
+  EnumTimerType["setTimeout"] = "setTimeout";
+  EnumTimerType["setInterval"] = "setInterval";
+  EnumTimerType["setImmediate"] = "setImmediate";
+  EnumTimerType["requestAnimationFrame"] = "requestAnimationFrame";
+  return EnumTimerType;
+}({});
+/**
+ * 驗證傳入值是否為有效的日期表示（內部輔助）
+ * Validate whether the passed value is a valid date representation (internal helper)
+ *
+ * 公開不需要直接使用。
+ * Not needed publicly.
+ *
+ * 支援的型別：dayjs.Dayjs、Date、數字（時間戳）、可解析的日期字串
+ * Supported types: dayjs.Dayjs, Date, number (timestamp), parseable date string
+ *
+ * @param who - 待驗證的值 / value to validate
+ * @returns 是否為有效日期表示 / whether it is a valid date representation
+ */
+function isValidDate(who) {
+  if (dayjs.isDayjs(who) || who instanceof Date) {
+    return true;
+  } else if (typeof who == 'number' && dayjs(who).isValid()) {
+    return true;
+  } else if (Date.parse(who)) {
+    return true;
+  }
+  return false;
+}
+/**
+ * 將數值或 Duration 轉換為 Duration 型別
+ * Converts a number or Duration to a Duration type
+ *
+ * 若輸入已是 Duration，則直接回傳；否則以數值建立 Duration（單位為毫秒）
+ * If input is already a Duration, return it directly; otherwise create a Duration from the number (in milliseconds)
+ *
+ * @param value - 數值或 Duration / number or Duration
+ * @returns Duration 型別 / Duration instance
+ */
+function toDuration(value) {
+  return dayjs.isDuration(value) ? value : dayjs.duration(value);
+}
+/**
+ * 驗證並正規化 delay，對齊標準 Web API 的處理方式（集中複用，不在各呼叫點重複寫死）。
+ * Validate and normalize a delay, aligning with the standard Web API (shared/reusable, not inlined).
+ *
+ * 規則 / Rules:
+ * - `undefined` / `null` → `0`（對齊 `setTimeout(func)` 省略 delay）。
+ * - 數值非有限（Infinity / -Infinity / NaN）→ 拋 `RangeError`（避免產生失控計時器）。
+ * - `dayjs.Duration` 解析後非有限（dayjs.duration(NaN) / dayjs.duration(Infinity)）→ 拋 `RangeError`。
+ * - 負數 delay → 箝成 `0`（標準 Web API：timeout < 0 視為 0）。
+ *
+ * @param delay - 延遲（數值 / Duration / undefined / null）/ delay (number / Duration / undefined / null)
+ * @returns 有限且有效的 delay（number | duration.Duration）
+ */
+function normalizeDelay(delay) {
+  const value = delay !== null && delay !== void 0 ? delay : 0;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new RangeError(`fake-timer: delay must be a finite number; received ${String(delay)} ` + `(Infinity / -Infinity / NaN are not allowed — they create uncontrolled timers).`);
+    }
+    return value < 0 ? 0 : value;
+  }
+  if (!Number.isFinite(value.asMilliseconds())) {
+    throw new RangeError(`fake-timer: delay Duration must resolve to a finite number of milliseconds; received ${String(delay)} ` + `(dayjs.duration(NaN) / dayjs.duration(Infinity) are not allowed).`);
+  }
+  return value.asMilliseconds() < 0 ? 0 : value;
+}
+
 class TimeCore {
   data = {};
   /**
@@ -16,7 +85,7 @@ class TimeCore {
    */
   constructor(options) {
     let now;
-    if (this.static.isValidDate(options)) {
+    if (isValidDate(options)) {
       [options, now] = [{}, options];
     }
     now = dayjs(now);
@@ -32,20 +101,6 @@ class TimeCore {
   static new(options) {
     let t = new this(options);
     return t;
-  }
-  get static() {
-    // @ts-ignore
-    return this.__proto__.constructor;
-  }
-  static isValidDate(who) {
-    if (dayjs.isDayjs(who) || who instanceof Date) {
-      return true;
-    } else if (typeof who == 'number' && dayjs(who).isValid()) {
-      return true;
-    } else if (Date.parse(who)) {
-      return true;
-    }
-    return false;
   }
   update(amount = 100, unit) {
     this.data.virtual_old = this.data.virtual_now;
@@ -76,6 +131,39 @@ class TimeCore {
     return this.data.virtual_now;
   }
   /**
+   * 虛擬時鐘的初始時間（t=0 基準），唯讀。
+   * The initial virtual clock time (t=0 reference), read-only.
+   *
+   * `data` 由 TimeCore 持有（虛擬時間的源頭），故這個取值 API 定義在此 class；
+   * `virtual_init` 即建立實例時捕捉的虛擬時間。
+   * `data` is owned by TimeCore (the source of virtual time), so this accessor lives here;
+   * `virtual_init` is the virtual time captured when the instance was created.
+   *
+   * 對外：FakeTimer 透過委派 `timer.initTime` 暴露同一值，請優先用它而非直接讀 `data.virtual_init`。
+   * Externally: FakeTimer exposes the same value by delegating to `timer.initTime`; prefer that over reading `data.virtual_init`.
+   *
+   * @see now
+   */
+  get initTime() {
+    return this.data.virtual_init;
+  }
+  /**
+   * 自建立以來經過的「虛擬」毫秒數（number，非 dayjs）。
+   * Elapsed VIRTUAL milliseconds since creation (number, not dayjs).
+   *
+   * 等價於 `now().diff(initTime)`，但省去自行取 clock 再相減；實作同樣位於 TimeCore（持有 data 與 now）。
+   * Equivalent to `now().diff(initTime)` without reaching for the clock; implemented here on TimeCore too (owns data and now).
+   *
+   * 注意 / Note：這是「虛擬時間」的經過量，不是真實牆鐘。
+   * This is the elapsed VIRTUAL time, not the real wall-clock.
+   *
+   * @see initTime
+   * @see now
+   */
+  get elapsedMilliseconds() {
+    return this.now().diff(this.initTime);
+  }
+  /**
    * 將虛擬時間重置回初始值（virtual_init），並重設識別碼計數器
    * Reset the virtual time back to its initial value (virtual_init) and reset the id counter
    *
@@ -94,16 +182,6 @@ class TimeCore {
     return this;
   }
 }
-
-dayjs.extend(duration);
-dayjs.extend(minMax);
-let EnumTimerType = /*#__PURE__*/function (EnumTimerType) {
-  EnumTimerType["setTimeout"] = "setTimeout";
-  EnumTimerType["setInterval"] = "setInterval";
-  EnumTimerType["setImmediate"] = "setImmediate";
-  EnumTimerType["requestAnimationFrame"] = "requestAnimationFrame";
-  return EnumTimerType;
-}({});
 
 /**
  * 計時器回呼函式介面
@@ -263,42 +341,37 @@ function queueSortCallback(a, b) {
   return a.virtualTiming.diff(b.virtualTiming);
 }
 
-dayjs.extend(duration);
-function toDuration(value) {
-  return dayjs.isDuration(value) ? value : dayjs.duration(value);
-}
-/**
- * 驗證並正規化 delay，對齊標準 Web API 的處理方式（集中複用，不在各呼叫點重複寫死）。
- * Validate and normalize a delay, aligning with the standard Web API (shared/reusable, not inlined).
- *
- * 規則 / Rules:
- * - `undefined` / `null` → `0`（對齊 `setTimeout(func)` 省略 delay）。
- * - 數值非有限（Infinity / -Infinity / NaN）→ 拋 `RangeError`（避免產生失控計時器）。
- * - `dayjs.Duration` 解析後非有限（dayjs.duration(NaN) / dayjs.duration(Infinity)）→ 拋 `RangeError`。
- * - 負數 delay → 箝成 `0`（標準 Web API：timeout < 0 視為 0）。
- *
- * @returns 有限且有效的 delay（number | duration.Duration）
- */
-function normalizeDelay(delay) {
-  const value = delay !== null && delay !== void 0 ? delay : 0;
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) {
-      throw new RangeError(`fake-timer: delay must be a finite number; received ${String(delay)} ` + `(Infinity / -Infinity / NaN are not allowed — they create uncontrolled timers).`);
-    }
-    return value < 0 ? 0 : value;
-  }
-  if (!Number.isFinite(value.asMilliseconds())) {
-    throw new RangeError(`fake-timer: delay Duration must resolve to a finite number of milliseconds; received ${String(delay)} ` + `(dayjs.duration(NaN) / dayjs.duration(Infinity) are not allowed).`);
-  }
-  return value.asMilliseconds() < 0 ? 0 : value;
-}
 class FakeTimer {
   cache = {
     done: []
   };
   frameInterval = dayjs.duration(1000 / 60);
   get initTime() {
-    return this.timer.data.virtual_init;
+    return this.timer.initTime;
+  }
+  /**
+   * 自建立以來經過的「虛擬」毫秒數（number，非 dayjs）。
+   * Elapsed VIRTUAL milliseconds since creation (number, not dayjs).
+   *
+   * 等價於 `timer.now().diff(initTime)`，但省去自行取 clock 再相減。
+   * Equivalent to `timer.now().diff(initTime)` without reaching for the clock yourself.
+   *
+   * 使用時機 / When to use：
+   *   需要「從基準到現在過了多久（虛擬）」的純數字時，用它取代 `timer.now().diff(initTime)`。
+   *   Use it when you need the elapsed virtual time as a plain number instead of `timer.now().diff(initTime)`.
+   *
+   * 注意 / Note：
+   *   這是「虛擬時間」的經過量，不是真實牆鐘；要絕對虛擬時間請用 `timer.now()`。
+   *   This is the elapsed VIRTUAL time, not the real wall-clock; for the absolute virtual time use `timer.now()`.
+   *
+   * 委派 / Delegation：本 getter 委派給 `timer.elapsedMilliseconds`（實作位於 TimeCore）。
+   * Delegation: this getter delegates to `timer.elapsedMilliseconds` (implemented on TimeCore).
+   *
+   * @see initTime
+   * @see Timer.now
+   */
+  get elapsedMilliseconds() {
+    return this.timer.elapsedMilliseconds;
   }
   _activeRun = null;
   _gen = null;
