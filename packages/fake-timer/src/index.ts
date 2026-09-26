@@ -1326,9 +1326,6 @@ export const clearInterval = defaultFakeTimer.clearInterval;
 /** 便捷匯出：直接使用全域 Timer 的 clearImmediate / Convenience export: use global Timer's clearImmediate */
 export const clearImmediate = defaultFakeTimer.clearImmediate;
 
-/** 便捷匯出：直接使用全域 Timer 的 advance / Convenience export: use global Timer's advance */
-export const advance = defaultFakeTimer.advance;
-
 /** 便捷匯出：直接使用全域 Timer 的 run（同步）/ Convenience export: use global Timer's run (sync) */
 export const run = defaultFakeTimer.run;
 
@@ -1352,41 +1349,3 @@ export const requestAnimationFrame = defaultFakeTimer.requestAnimationFrame;
 
 /** 便捷匯出：直接使用全域 Timer 的 cancelAnimationFrame / Convenience export: use global Timer's cancelAnimationFrame */
 export const cancelAnimationFrame = defaultFakeTimer.cancelAnimationFrame;
-
-// @ts-ignore
-if (process.env.TSDX_FORMAT !== 'esm')
-{
-	Object.defineProperty(defaultFakeTimer, "__esModule", { value: true });
-
-	Object.defineProperty(defaultFakeTimer, "default", { value: defaultFakeTimer });
-	Object.defineProperty(defaultFakeTimer, "FakeTimer", { value: FakeTimer });
-
-	Object.defineProperty(defaultFakeTimer, "QueueTimer", { value: QueueTimer });
-	Object.defineProperty(defaultFakeTimer, "TimeCore", { value: TimeCore });
-
-	Object.defineProperty(defaultFakeTimer, "toDuration", { value: toDuration });
-	Object.defineProperty(defaultFakeTimer, "normalizeDelay", { value: normalizeDelay });
-	Object.defineProperty(defaultFakeTimer, "normalizeDelaySafe", { value: normalizeDelaySafe });
-
-	Object.defineProperty(defaultFakeTimer, "setTimeout", { value: setTimeout });
-	Object.defineProperty(defaultFakeTimer, "setInterval", { value: setInterval });
-	Object.defineProperty(defaultFakeTimer, "setImmediate", { value: setImmediate });
-
-	Object.defineProperty(defaultFakeTimer, "clearTimeout", { value: clearTimeout });
-	Object.defineProperty(defaultFakeTimer, "clearInterval", { value: clearInterval });
-	Object.defineProperty(defaultFakeTimer, "clearImmediate", { value: clearImmediate });
-
-	Object.defineProperty(defaultFakeTimer, "advance", { value: advance });
-	Object.defineProperty(defaultFakeTimer, "run", { value: run });
-	Object.defineProperty(defaultFakeTimer, "runAsync", { value: runAsync });
-	Object.defineProperty(defaultFakeTimer, "start", { value: start });
-	Object.defineProperty(defaultFakeTimer, "startAsync", { value: startAsync });
-
-	Object.defineProperty(defaultFakeTimer, "clearAll", { value: clearAll });
-	Object.defineProperty(defaultFakeTimer, "reset", { value: reset });
-	Object.defineProperty(defaultFakeTimer, "requestAnimationFrame", { value: requestAnimationFrame });
-	Object.defineProperty(defaultFakeTimer, "cancelAnimationFrame", { value: cancelAnimationFrame });
-
-	Object.defineProperty(defaultFakeTimer, "UnsafeGlobalFakeTimer", { value: UnsafeGlobalFakeTimer });
-	Object.defineProperty(defaultFakeTimer, "getUnsafeGlobalFakeTimer", { value: getUnsafeGlobalFakeTimer });
-}
