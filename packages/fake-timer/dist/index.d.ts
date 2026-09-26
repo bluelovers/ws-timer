@@ -341,10 +341,16 @@ export interface ITimer {
 	run(): this;
 	/** 非同步執行所有到期項目（等待每個回呼）/ Asynchronously run expired items (awaits each callback) */
 	runAsync(): Promise<this>;
+	/** 以生成器逐個執行到期項目並回傳生成器（不回傳 this）/ Run expired items one-by-one as a generator (does NOT return this) */
+	runGenerator(): Generator<ITimeQueueItem, void, void>;
 	/** 推進虛擬時間並同步執行到期項目 / Advance fake time and synchronously run expired items */
 	start(amount?: IDurationInput): this;
 	/** 推進虛擬時間並非同步執行到期項目 / Advance fake time and asynchronously run expired items */
 	startAsync(amount?: IDurationInput): Promise<this>;
+	/** 暫停進行中的 run，並將虛擬時間修正為下一個待執行項目的觸發時間 / Pause the in-progress run and correct virtual time to the next pending item's timing */
+	pause(): this;
+	/** 取消進行中的 run，並將虛擬時間修正回本次 run 開始前的值 / Cancel the in-progress run and correct virtual time back to the pre-run value */
+	cancel(): this;
 	/** 清空所有佇列項目（不影響時鐘）/ Clear all queued items (does not affect the clock) */
 	clearAll(): this;
 	/** 清空佇列並將虛擬時間重置回初始值 / Clear the queue and reset the fake clock to its initial value */
@@ -386,6 +392,45 @@ export declare class FakeTimer implements ITimer {
 	 * Defaults to 1000/60 ms (~60fps). Override directly to simulate other refresh rates.
 	 */
 	frameInterval: duration.Duration;
+	/**
+	 * 內部 run 狀態（pending 即為內部 API）。
+	 * Internal run state (pending is the internal API).
+	 *
+	 * 同時作為三道防線 / Doubles as three guards at once:
+	 *   1. 並發防護：run / runAsync / runGenerator 執行期間不得重入（防止雙重處理）。
+	 *      1. Re-entrancy: run / runAsync / runGenerator must not re-enter while active
+	 *         (prevents double-processing).
+	 *   2. 時間跳躍防護：執行期間禁止 advance() 推進虛擬時間。
+	 *      2. Time-jump guard: advance() is forbidden while a run is in progress.
+	 *   3. 追加計時器入口：回呼內 setTimeout/setInterval 追加的項目經由 tryAdd 併入本輪 run。
+	 *      3. Append entry: timers appended in callbacks reach the run via tryAdd.
+	 */
+	protected _activeRun: {
+		/** 本輪 run 鎖定的虛擬時間（執行期間不可變動）/ Virtual time locked for this run (immutable during run) */
+		now: dayjs.Dayjs;
+		/** 內部待執行佇列 / internal pending queue */
+		pending: ITimeQueueItem[];
+		/** 已納入 pending 的項目集合（O(1) 查詢，使用 WeakSet 避免持有已移除項目的參考）/ set of items already in pending (O(1) lookup; WeakSet avoids retaining removed items) */
+		seen: WeakSet<ITimeQueueItem>;
+		/** 將回呼內追加的項目併入 pending（若已到期）/ merge a callback-appended item into pending (if due) */
+		tryAdd(item: ITimeQueueItem): void;
+	} | null;
+	/** 目前活躍 run 的快取生成器：run / runAsync / runGenerator 共用同一份狀態。
+	 * Cached generator of the active run: run / runAsync / runGenerator share one state. */
+	protected _gen: Generator<ITimeQueueItem, void, void> | null;
+	/** 本次 run 開始前的虛擬時間（供 cancel / pause 修正時間使用）。
+	 * Virtual time before this run started (used by cancel / pause to correct time). */
+	protected _runStartNow: dayjs.Dayjs | null;
+	/** 目前正被執行的佇列項目（供 pause / cancel 中斷時移除已觸發的項目）。
+	 * The queue item currently being executed (used by pause / cancel to remove the already-fired item). */
+	protected _current: ITimeQueueItem | null;
+	/** 中斷旗標：pause / cancel 在回呼內設定，_runCore 於每次 yield 後檢查並結束本輪 run。
+	 * 使用旗標而非 generator.return()，是因為回呼可能在自動觸發回呼的生成器內執行，
+	 * 此時直接 return() 會拋出「Generator is already running」。
+	 * Abort flag: set by pause / cancel inside a callback; _runCore checks it after each yield to
+	 * end the run. A flag (not generator.return()) is used because the callback may run INSIDE a
+	 * generator that auto-invokes callbacks, where return() would throw "Generator is already running". */
+	protected _abort: boolean;
 	/**
 	 * 建立 Timer 實例
 	 * Create a Timer instance
@@ -586,6 +631,45 @@ export declare class FakeTimer implements ITimer {
 	 */
 	runAsync: () => Promise<this>;
 	/**
+	 * 包裝 _runCore() 的內部生成器：逐一執行到期項目時自動觸發回呼並 yield 已執行項目。
+	 * Internal generator wrapping _runCore(): fires each callback automatically and yields the
+	 * executed item — this is the original runGenerator behavior.
+	 */
+	protected _wrapRunGen(): Generator<ITimeQueueItem, void, void>;
+	/**
+	 * 取得本輪 run 的生成器（內部 API，即使用者指定的快取邏輯）。
+	 * Obtain the generator for this run (internal API — the caching logic the user specified).
+	 *
+	 * 若已有活躍 run，回傳同一份快取生成器（重入 no-op）；
+	 * 否則只要 this._gen 尚未建立（或上一輪已結束被 finally 清空）就建立一次，
+	 * 因此即使尚未開始迭代就多次呼叫，也只會得到同一份內部狀態。
+	 * If a run is already active, return the same cached generator (re-entrant no-op);
+	 * otherwise create it only when this._gen is unset (or was cleared by the previous run's
+	 * finally), so repeated calls — even before any iteration — yield the SAME state.
+	 *
+	 * 快取的生成器為 _wrapRunGen()：會自動觸發回呼，保留原有 runGenerator 的 API 行為。
+	 * The cached generator is _wrapRunGen(), which fires callbacks automatically — preserving the
+	 * original runGenerator API behavior.
+	 *
+	 * @returns 執行項目的生成器（不回傳 this）/ generator of executed items (does NOT return this)
+	 */
+	protected _runGenerator(): Generator<ITimeQueueItem, void, void>;
+	/**
+	 * 以生成器逐個執行到期項目（自動觸發回呼並 yield 已執行項目）。
+	 * Run expired items one-by-one as a generator (auto-fires callbacks and yields executed items).
+	 *
+	 * 保留原有 runGenerator 的 API 行為：回呼會被自動呼叫，並逐一 yield 已執行的佇列項目，
+	 * 方便呼叫者在項目之間插入觀察或處理邏輯。內部直接採用快取的 _runGenerator() 狀態，
+	 * 因此多次呼叫只會得到同一份內部狀態（不會重複產生 / 雙重處理）。
+	 * Preserves the original runGenerator API behavior: callbacks are fired automatically and each
+	 * executed item is yielded, handy for observing/handling between items. Internally uses the
+	 * cached _runGenerator() state, so repeated calls yield the SAME internal state (no duplicate
+	 * generation / double-processing).
+	 *
+	 * @returns 執行項目的生成器（不回傳 this）/ generator of executed items (does NOT return this)
+	 */
+	runGenerator(): Generator<ITimeQueueItem, void, void>;
+	/**
 	 * 推進虛擬時間並同步執行到期的計時器
 	 * Advance fake time and synchronously run expired timers
 	 *
@@ -601,6 +685,30 @@ export declare class FakeTimer implements ITimer {
 	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
 	 */
 	startAsync: (amount?: IDurationInput) => Promise<this>;
+	/**
+	 * 暫停目前進行中的 run（執行完當前項目後停止）。
+	 * Pause the in-progress run (stops after the current item finishes).
+	 *
+	 * 中斷後會將虛擬時間「修正」為佇列中下一個待執行項目的觸發時間，
+	 * 使剩餘計時器保持相對順序、日後可從中斷處續跑。
+	 * After interruption, the virtual time is "corrected" to the fire time of the next pending
+	 * item, so the remaining timers keep their relative order and can resume later from where
+	 * we left off.
+	 *
+	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
+	 */
+	pause: () => this;
+	/**
+	 * 取消目前進行中的 run，並將虛擬時間「修正」回本次 run 開始前的值（撤銷時間跳躍）。
+	 * Cancel the in-progress run and "correct" the virtual time back to the value it had before
+	 * this run started (undoing the time jump).
+	 *
+	 * 佇列中的計時器保持不變（僅不再執行本輪剩餘項目）。
+	 * Timers in the queue are left unchanged (only the rest of this run is aborted).
+	 *
+	 * @returns this（支援鏈式呼叫）/ this (supports chaining)
+	 */
+	cancel: () => this;
 }
 export declare function getUnsafeGlobalFakeTimer(): UnsafeGlobalFakeTimer;
 /**
@@ -634,17 +742,17 @@ export declare const enum EnumGlobalClockState {
 }
 export declare class UnsafeGlobalFakeTimer extends FakeTimer {
 	/** 全域時鐘是否由「本實例」安裝 / Whether the global clock was installed by THIS instance */
-	private _clockInstalled;
+	protected _clockInstalled: boolean;
 	/** 原始 Date.now 實作（用於還原）/ Original Date.now implementation (for restore) */
-	private _originalDateNow?;
+	protected _originalDateNow?: () => number;
 	/** 原始 performance.now 實作（用於還原）/ Original performance.now implementation (for restore) */
-	private _originalPerfNow?;
+	protected _originalPerfNow?: () => number;
 	/**
 	 * 實際執行還原（不重入、不委派），供 installGlobalClock 註冊的全域反安裝函式呼叫。
 	 * Performs the actual restore (non-reentrant, non-delegating); invoked by the global
 	 * uninstall closure registered during installGlobalClock.
 	 */
-	private _doUninstall;
+	protected _doUninstall: () => void;
 	/**
 	 * 查詢全域時鐘的安裝狀態，區分是由本實例或全域（可能是其它實例）安裝。
 	 * Inspect the global-clock installation state, distinguishing whether it was installed
