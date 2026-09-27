@@ -1,5 +1,4 @@
 import type { Dayjs } from 'dayjs';
-import { dayjs, duration } from './dayjs';
 import type { Duration } from 'dayjs/plugin/duration';
 import type { EnumTimerType } from './util';
 import type { FakeTimer } from './index';
@@ -187,7 +186,7 @@ export interface ITimerFunc extends Function
 {
 	(callback: ICallback, delay?: number, ...params: any[]): ITimeQueueItem;
 
-	(callback: ICallback, delay?: duration.Duration, ...params: any[]): ITimeQueueItem;
+	(callback: ICallback, delay?: Duration, ...params: any[]): ITimeQueueItem;
 }
 
 /**
@@ -215,7 +214,7 @@ export interface ITimer
 	clearImmediate(handle?: ITimerHandle): IRemovedTimer;
 
 	/** 取得虛擬時鐘的初始時間（t=0 基準），不必操作底層 `timer.data` / Get the initial virtual clock time (t=0 reference), without touching the underlying `timer.data` */
-	readonly initTime: dayjs.Dayjs;
+	readonly initTime: Dayjs;
 
 	/** 自建立以來經過的虛擬毫秒數（純數字，非 dayjs）/ Elapsed virtual milliseconds since creation (plain number, not dayjs) */
 	readonly elapsedMilliseconds: number;

@@ -2,11 +2,13 @@
  * Created by user on 2017/11/10/010.
  */
 
-import { dayjs, duration } from './dayjs';
+import { dayjs } from './dayjs';
 import { QueueTimer } from './queue';
 import { TimeCore } from './time';
 import { EnumTimerType, compareQueueItemIdAsc, normalizeDelay, normalizeDelaySafe, toDuration } from './util';
 import { ICallback, IDurationInput, IRemovedTimer, ITimeData, ITimeQueueItem, ITimer, ITimerHandle } from './types';
+import type { Dayjs } from 'dayjs';
+import type { Duration } from 'dayjs/plugin/duration';
 
 export type * from './types';
 export * from './util';
@@ -51,7 +53,7 @@ export class FakeTimer implements ITimer
 	 * 預設為 1000/60 毫秒（約 60fps）。可直接覆寫以模擬不同刷新率。
 	 * Defaults to 1000/60 ms (~60fps). Override directly to simulate other refresh rates.
 	 */
-	public frameInterval: duration.Duration = dayjs.duration(1000 / 60);
+	public frameInterval: Duration = dayjs.duration(1000 / 60);
 
 	/**
 	 * 虛擬時鐘的初始時間（t=0 基準），唯讀。
@@ -70,7 +72,7 @@ export class FakeTimer implements ITimer
 	 * 委派 / Delegation：本 getter 委派給 `timer.initTime`；`data` 與其取值邏輯實際位於 TimeCore（data 的持有者）。
 	 * Delegation: this getter delegates to `timer.initTime`; `data` and its access logic actually live on TimeCore (the owner of `data`).
 	 */
-	public get initTime(): dayjs.Dayjs
+	public get initTime()
 	{
 		return this.timer.initTime;
 	}
@@ -132,7 +134,7 @@ export class FakeTimer implements ITimer
 	 */
 	protected _activeRun: {
 		/** 本輪 run 鎖定的虛擬時間（執行期間不可變動）/ Virtual time locked for this run (immutable during run) */
-		now: dayjs.Dayjs;
+		now: Dayjs;
 		/** 內部待執行佇列 / internal pending queue */
 		pending: ITimeQueueItem[];
 		/** 已納入 pending 的項目集合（O(1) 查詢，使用 WeakSet 避免持有已移除項目的參考）/ set of items already in pending (O(1) lookup; WeakSet avoids retaining removed items) */
@@ -151,7 +153,7 @@ export class FakeTimer implements ITimer
 	 * 本次 run 開始前的虛擬時間（供 cancel / pause 修正時間使用）。
 	 * Virtual time before this run started (used by cancel / pause to correct time).
 	 */
-	protected _runStartNow: dayjs.Dayjs | null = null;
+	protected _runStartNow: Dayjs | null = null;
 
 	/**
 	 * 目前正被執行的佇列項目（供 pause / cancel 中斷時移除已觸發的項目）。
@@ -678,8 +680,8 @@ export class FakeTimer implements ITimer
 
 				if (current.type === EnumTimerType.setInterval && current.interval != null)
 				{
-					const oldTiming = current.virtualTiming as dayjs.Dayjs;
-					const nextTiming = oldTiming.add(current.interval as duration.Duration);
+					const oldTiming = current.virtualTiming as Dayjs;
+					const nextTiming = oldTiming.add(current.interval as Duration);
 
 					/**
 					 * 重新排程後「時間有推進」且仍 <= now：就地推進 timing，並以二分插入
@@ -980,7 +982,7 @@ export class FakeTimer implements ITimer
 
 		this.timer.sort();
 
-		let next: dayjs.Dayjs | null = null;
+		let next: Dayjs | null = null;
 
 		for (const q of this.timer.queue)
 		{
@@ -1241,7 +1243,7 @@ export class UnsafeGlobalFakeTimer extends FakeTimer
 
 		if (perf && this._originalPerfNow)
 		{
-			perf.now = () => this.timer.now().valueOf() - (this.timer.data.virtual_init as dayjs.Dayjs).valueOf();
+			perf.now = () => this.timer.now().valueOf() - (this.timer.data.virtual_init as Dayjs).valueOf();
 		}
 
 		this._clockInstalled = true;

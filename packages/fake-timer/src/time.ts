@@ -5,6 +5,7 @@
 import { dayjs } from './dayjs';
 import { isValidDate } from './util';
 import { ITimeDataCore } from './types';
+import { Dayjs, ManipulateType } from 'dayjs';
 
 /**
  * 時間基礎類別，提供可控的虛擬時間環境
@@ -91,14 +92,14 @@ export class TimeCore
 	 * Internal: prefer FakeTimer.advance() / start() to advance time; calling this directly
 	 * bypasses the time-jump guard and cache invariants.
 	 */
-	update(amount: any = 100, unit?: dayjs.ManipulateType)
+	update(amount: any = 100, unit?: ManipulateType)
 	{
 		/** 記錄更新前的虛擬時間 / Record virtual time before update */
-		this.data.virtual_old = this.data.virtual_now as dayjs.Dayjs;
+		this.data.virtual_old = this.data.virtual_now as Dayjs;
 
 		if (dayjs.isDuration(amount))
 		{
-			this.data.virtual_now = (this.data.virtual_now as dayjs.Dayjs).add(amount);
+			this.data.virtual_now = (this.data.virtual_now as Dayjs).add(amount);
 		}
 		else if (typeof amount == 'object')
 		{
@@ -106,11 +107,11 @@ export class TimeCore
 		}
 		else if (unit || typeof amount == 'number')
 		{
-			this.data.virtual_now = (this.data.virtual_now as dayjs.Dayjs).add(amount, unit);
+			this.data.virtual_now = (this.data.virtual_now as Dayjs).add(amount, unit);
 		}
 		else
 		{
-			this.data.virtual_now = (this.data.virtual_now as dayjs.Dayjs).add(100);
+			this.data.virtual_now = (this.data.virtual_now as Dayjs).add(100);
 		}
 
 		return this;
@@ -132,16 +133,16 @@ export class TimeCore
 
 	/**
 	 * 取得當前虛擬時間（dayjs.Dayjs，非數值）。
-	 * Get the current virtual time (dayjs.Dayjs, NOT a number).
+	 * Get the current virtual time (Dayjs, NOT a number).
 	 *
 	 * 這是 FakeTimer 回呼內 `self.timer.now()` 讀取的時鐘；計算「自建立以來經過的毫秒數」
 	 * 請用 `now().diff(virtual_init)`（或 FakeTimer.initTime）。
 	 * This is the clock read via `self.timer.now()` inside callbacks. To compute elapsed ms
 	 * since creation, use `now().diff(virtual_init)` (or FakeTimer.initTime).
 	 */
-	now(): dayjs.Dayjs
+	now(): Dayjs
 	{
-		return this.data.virtual_now as dayjs.Dayjs;
+		return this.data.virtual_now as Dayjs;
 	}
 
 	/**
@@ -158,9 +159,9 @@ export class TimeCore
 	 *
 	 * @see now
 	 */
-	public get initTime(): dayjs.Dayjs
+	public get initTime(): Dayjs
 	{
-		return this.data.virtual_init as dayjs.Dayjs;
+		return this.data.virtual_init as Dayjs;
 	}
 
 	/**

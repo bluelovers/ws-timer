@@ -3,13 +3,14 @@
  * Shared utility functions (pure, side-effect-free) used by TimeCore / QueueTimer / FakeTimer to avoid duplication.
  */
 
-import { dayjs, duration } from './dayjs';
+import { dayjs } from './dayjs';
 
 import { IDurationInput, ITimeQueueItem } from './types';
 
 // 僅需 timer 的 now()；用 type-only 匯入 TimeCore，避免與 time.ts（其值匯入 util）產生執行期循環依賴。
 // Only timer.now() is needed; type-only import of TimeCore avoids a runtime cycle with time.ts (which value-imports util).
 import type { TimeCore } from './time';
+import { Duration } from 'dayjs/plugin/duration';
 
 /**
  * 計時器種類（鍵值相等，便於直接比較）
@@ -69,7 +70,7 @@ export function isValidDate(who): boolean
  * @param value - 數值或 Duration / number or Duration
  * @returns Duration 型別 / Duration instance
  */
-export function toDuration(value: IDurationInput): duration.Duration
+export function toDuration(value: IDurationInput): Duration
 {
 	return dayjs.isDuration(value) ? value : dayjs.duration(value);
 }
