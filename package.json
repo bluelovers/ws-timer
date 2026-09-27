@@ -47,9 +47,9 @@
   "devDependencies": {
     "@bluelovers/tsconfig": "^2.0.3",
     "@types/jest": "^30.0.0",
-    "@types/node": "*",
-    "@yarn-tool/require-resolve": "*",
-    "@yarn-tool/ws-find-up-paths": "*",
-    "undici-types": "^8.10.2"
+    "@types/node": "^26.6.3",
+    "@yarn-tool/require-resolve": "^4.0.9",
+    "@yarn-tool/ws-find-up-paths": "^1.0.22",
+    "undici-types": "^8.11.2"
   }
 }

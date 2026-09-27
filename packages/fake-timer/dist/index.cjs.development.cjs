@@ -2,10 +2,16 @@
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
-var dayjs = require('dayjs');
-require('dayjs/plugin/duration');
-require('dayjs/plugin/minMax');
+var _dayjs = require('dayjs');
+var duration = require('dayjs/plugin/duration');
+var minMax = require('dayjs/plugin/minMax');
 var nanoid = require('nanoid');
+
+const dayjs = /*#__PURE__*/(() => {
+  _dayjs.extend(duration);
+  _dayjs.extend(minMax);
+  return _dayjs;
+})();
 
 let EnumTimerType = /*#__PURE__*/function (EnumTimerType) {
   EnumTimerType["setTimeout"] = "setTimeout";
