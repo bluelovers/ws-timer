@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.6](https://github.com/bluelovers/ws-timer/compare/tic2@1.0.5...tic2@1.0.6) (2026-09-27)
+
+
+
+### 🛠　Build System
+
+* **deps:** 更新開發依賴與相關套件版本 ([e0ca115](https://github.com/bluelovers/ws-timer/commit/e0ca115fdfca3a0801957b38cde4dc896932c907))
+
+
+
 ## [1.0.5](https://github.com/bluelovers/ws-timer/compare/tic2@1.0.4...tic2@1.0.5) (2026-09-21)
 
 
